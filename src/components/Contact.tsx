@@ -1,7 +1,7 @@
 const Contact = () => {
     return (
       <div className="container mx-auto px-6">
-        <h2 className="text-3xl font-bold text-center mb-8">聯絡克萊爾</h2>
+        <h2 className="text-3xl font-bold text-center mb-8">聯絡我們</h2>
         <div className="max-w-md mx-auto">
           <form className="space-y-4">
             <div>

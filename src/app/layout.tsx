@@ -7,10 +7,10 @@ const inter = Inter({ subsets: ['latin'] })
 
 // 設定網站的基本元數據
 export const metadata: Metadata = {
-  title: '克萊爾數位煉金室',
+  title: 'ByTheWay 浩華智能取餐',
   description: '您的網站描述',
   keywords: '關鍵詞1, 關鍵詞2, 關鍵詞3',
-  authors: [{ name: '克萊爾' }],
+  authors: [{ name: 'BTW' }],
   viewport: 'width=device-width, initial-scale=1',
 }
 

@@ -20,11 +20,11 @@ const Navbar = () => {
             Logo
           </a>
           <div className="hidden md:flex space-x-8">
-            <a href="#about" className="hover:text-gray-600">解決痛點</a>
-            <a href="#services" className="hover:text-gray-600">煉金觀點</a>
-            <a href="#restaurant" className="hover:text-gray-600">關於克萊爾</a>
-            <a href="#investors" className="hover:text-gray-600">資源下載</a>
-            <a href="#contact" className="hover:text-gray-600">聯絡克萊爾</a>
+            <a href="#about" className="hover:text-gray-600">關於BTW</a>
+            <a href="#services" className="hover:text-gray-600">企業服務</a>
+            <a href="#restaurant" className="hover:text-gray-600">餐廳招募</a>
+            <a href="#investors" className="hover:text-gray-600">投資人關係</a>
+            <a href="#contact" className="hover:text-gray-600">聯絡我們</a>
           </div>
         </div>
       </div>
