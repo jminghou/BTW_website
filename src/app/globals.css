@@ -2,4 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* 您的全局樣式 */
+@import '../../styles/components/buttons/buttons.css';
+
+/* 其他全局樣式 */

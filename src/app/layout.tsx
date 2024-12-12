@@ -9,7 +9,7 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: 'ByTheWay 浩華智能取餐',
   description: '您的網站描述',
-  keywords: '關鍵詞1, 關鍵詞2, 關鍵詞3',
+  keywords: '智能取餐, 熱食便當機, 輪動便當機, 熱食便當機推薦, 輪動便當機推薦,',
   authors: [{ name: 'BTW' }],
   viewport: 'width=device-width, initial-scale=1',
 }
