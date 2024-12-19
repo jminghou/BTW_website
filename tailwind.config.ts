@@ -11,8 +11,13 @@ export default {
       colors: {
         background: "var(--background)",
         foreground: "var(--foreground)",
+        'logo-color': '#03b4c7',
+        'custom-dark': '#0c2123',
+        
       },
     },
   },
   plugins: [],
 } satisfies Config;
+
+

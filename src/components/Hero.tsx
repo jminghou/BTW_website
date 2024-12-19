@@ -3,7 +3,7 @@
 import Image from 'next/image'
 import { useState, useEffect } from 'react';
 import ImageSlideshow from './ImageSlideshow'
-import Button from './buttons/Button'
+import GoldenButton from './buttons/GoldenButton'
 
 const Hero = () => {
   const slideImages = [
@@ -18,7 +18,7 @@ const Hero = () => {
   return (
     <div className="relative h-screen bg-cover bg-center bg-no-repeat" 
          style={{ backgroundImage: "url('/images/landingpage/banner_food.jpg')" }}>
-      <div className="absolute inset-0 bg-black/50"></div>
+      <div className="absolute inset-0 bg-custom-dark/70"></div>
       
       <div className="relative z-10 h-full flex items-center justify-center">
         <div className="container mx-auto px-4">
@@ -39,12 +39,12 @@ const Hero = () => {
               <p className="text-xl mb-8 text-white">天天換餐點 | 餐餐不失溫</p>
               
               <div className="space-x-4 flex justify-center md:justify-start">
-                <Button variant="neumorphic">
+                <GoldenButton>
                   企業合作
-                </Button>
-                <Button variant="neumorphic">
+                </GoldenButton>
+                <GoldenButton>
                   餐廳合作
-                </Button>
+                </GoldenButton>
               </div>
             </div>
           </div>
