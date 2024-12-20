@@ -4,14 +4,25 @@ import styled from 'styled-components';
 
 interface CardProps {
   children: ReactNode;
+  href?: string;
 }
 
-const Card: React.FC<CardProps> = ({ children }) => {
+const Card: React.FC<CardProps> = ({ children, href }) => {
+  const content = (
+    <div className="card">
+      {children}
+    </div>
+  );
+
   return (
     <StyledWrapper>
-      <div className="card">
-        {children}
-      </div>
+      {href ? (
+        <a href={href} style={{ textDecoration: 'none' }}>
+          {content}
+        </a>
+      ) : (
+        content
+      )}
     </StyledWrapper>
   );
 }
