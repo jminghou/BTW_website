@@ -40,10 +40,10 @@ const Hero = () => {
               
               <div className="space-x-4 flex justify-center md:justify-start">
                 <GoldenButton>
-                  企業合作
+                <a href="#services">企業合作</a>
                 </GoldenButton>
                 <GoldenButton>
-                  餐廳合作
+                <a href="#restaurant">餐廳合作</a>
                 </GoldenButton>
               </div>
             </div>
