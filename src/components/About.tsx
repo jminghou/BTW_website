@@ -20,7 +20,7 @@ const About = () => {
             <p className="text-base leading-8 text-gray-600">
             浩華企業股份有限公司成立於2016年
             </p>
-            <p className="text-2xl leading-8 text-gray-600">
+            <p className="text-base leading-8 text-gray-600">
             長年致力於革新企業餐飲服務模式！
             </p>
             <p className="text-base leading-8 text-gray-600 pt-4">
@@ -29,7 +29,7 @@ const About = () => {
             <p className="text-base leading-8 text-gray-600">
            透過科技創新成為熱食智能取餐第一品牌, 我們立志為企業打造更優質的餐飲服務。
             </p>
-            <p className="text-2xl leading-8 text-gray-600 pt-4">
+            <p className="text-base leading-8 text-gray-600 pt-4">
             我們相信良好的用餐體驗能提升員工幸福感，進而帶動企業正向發展。
             </p>
           </div>
