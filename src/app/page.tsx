@@ -5,34 +5,26 @@ import Services from '@/components/Services'
 import Restaurant from '@/components/Restaurant'
 import Investors from '@/components/Investors'
 import Contact from '@/components/Contact'
-import Ser_Machine from '@/components/Ser_Machine'
-import Ser_Office from '@/components/Ser_Office'
-import Ser_AD from '@/components/Ser_AD'
+import Advantages from '@/components/Advantages'
 
 export default function Home() {
   return (
     <main className="min-h-screen">
       <Navbar />
       <Hero />
-      <section id="about" className="min-h-screen py-16 md:py-0 md:h-screen flex items-center justify-center">
+      <section id="about" className="min-h-screen py-18 md:py-32">
         <About />
       </section>
-      <section id="services" className="min-h-screen py-16 md:py-0 md:h-screen flex items-center justify-center bg-gray-50">
+      <section id="services" className="py-32">
         <Services />
       </section>
-      <section id="ser_machine" className="min-h-screen py-16 md:py-0 md:h-screen flex items-center justify-center">
-        <Ser_Machine />
+      <section id="all-one" className="py-2">
+        <Advantages />
       </section>
-      <section id="ser_office" className="min-h-screen py-16 md:py-0 md:h-screen flex items-center justify-center bg-gray-50">
-        <Ser_Office />
-      </section>
-      <section id="ser_ad" className="min-h-screen py-16 md:py-0 md:h-screen flex items-center justify-center">
-        <Ser_AD />
-      </section>
-      <section id="restaurant" className="min-h-screen py-16 md:py-0 md:h-screen flex items-center justify-center bg-gray-50">
+      <section id="restaurant" className="py-32">
         <Restaurant />
       </section>
-      <section id="investors" className="min-h-screen py-16 md:py-0 md:h-screen flex items-center justify-center">
+      <section id="investors" className="py-32">
         <Investors />
       </section>
       <section id="contact" className="min-h-screen py-16 md:py-0 md:h-screen flex items-center justify-center bg-gray-50">
