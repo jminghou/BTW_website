@@ -16,7 +16,7 @@ const Contact = () => {
               <label className="block mb-2">訊息</label>
               <textarea className="w-full p-2 border rounded" rows={4}></textarea>
             </div>
-            <button className="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600">
+            <button className="w-full bg-[#00bed6] text-white py-2 rounded hover:bg-[#ffb71b]">
               送出
             </button>
           </form>

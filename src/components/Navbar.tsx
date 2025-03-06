@@ -5,7 +5,7 @@ import Image from 'next/image'
 const Navbar = () => {
   return (
     <nav className="fixed w-full bg-white shadow-md z-50">
-      <div className="container mx-auto px-6 py-0">
+      <div className="container mx-auto px-6 py-2">
         <div className="flex items-center justify-between">
           <a 
             href="#" 
@@ -16,10 +16,10 @@ const Navbar = () => {
             }}
           >
             <Image
-              src="/images/btw_full_logo.png"
+              src="/svg/btw_logo_b.svg"
               alt="BTW Logo"
-              width={270}
-              height={90}
+              width={240}
+              height={30}
               className="h-auto"
               priority
             />

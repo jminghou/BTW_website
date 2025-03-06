@@ -6,6 +6,7 @@ import Restaurant from '@/components/Restaurant'
 import Investors from '@/components/Investors'
 import Contact from '@/components/Contact'
 import Advantages from '@/components/Advantages'
+import SiteFooter from '@/components/SiteFooter'
 
 export default function Home() {
   return (
@@ -30,6 +31,7 @@ export default function Home() {
       <section id="contact" className="min-h-screen py-16 md:py-0 md:h-screen flex items-center justify-center bg-gray-50">
         <Contact />
       </section>
+      <SiteFooter />
     </main>
   )
 } 
