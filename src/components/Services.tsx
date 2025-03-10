@@ -3,8 +3,6 @@
 import { useState } from 'react';
 
 const Services = () => {
-
-
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
     const images = [
@@ -13,12 +11,21 @@ const Services = () => {
       { src: '/images/album/mp_03.jpg', alt: '智能熱食取餐機' },
     ];
 
-    const allImages = [
-      { src: '/images/album/all_01.jpg', alt: 'All for One 送餐服務' },
-      { src: '/images/album/all_02.jpg', alt: 'All for One 送餐服務' },
-      { src: '/images/album/all_03.jpg', alt: 'All for One 送餐服務' },
-      { src: '/images/album/all_04.jpg', alt: 'All for One 送餐服務' },
-    ];
+    // 添加滚动到 Services02 部分的函数
+    const scrollToServices02 = () => {
+      const services02Section = document.getElementById('services-02');
+      if (services02Section) {
+        services02Section.scrollIntoView({ behavior: 'smooth' });
+      }
+    };
+
+    // 添加滚动到 Advantages 部分的函数
+    const scrollToAdvantages = () => {
+      const advantagesSection = document.getElementById('all-one');
+      if (advantagesSection) {
+        advantagesSection.scrollIntoView({ behavior: 'smooth' });
+      }
+    };
 
     return (
       <div className="container mx-auto px-6">
@@ -54,19 +61,37 @@ const Services = () => {
             我們的創新服務為企業打造員工餐食解決方案，以物聯網系統實現完整訂餐流程，支援公司餐補及多種付買方式。
             </p>
 
-            {/* 相簿照片网格 */}
-            <div className="grid grid-cols-3 gap-4 mt-4">
-              {images.map((image, index) => (
+            {/* 按钮区域移至右侧文字区 */}
+            <div className="flex flex-col sm:flex-row gap-4 mt-8">
+              <button 
+                onClick={scrollToServices02}
+                className="px-6 py-2 bg-[#00bed6] text-white rounded-lg hover:bg-[#ffb71b] transition-colors duration-300 shadow-md hover:shadow-lg text-base font-medium"
+              >
+                服務流程
+              </button>
+              <button 
+                onClick={scrollToAdvantages}
+                className="px-6 py-2 bg-[#00bed6] text-white rounded-lg hover:bg-[#ffb71b] transition-colors duration-300 shadow-md hover:shadow-lg text-base font-medium"
+              >
+                服務優勢
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* 相簿照片网格移至底部 */}
+        <div className="max-w-xl mx-auto mt-16">
+          <div className="grid grid-cols-3 gap-4">
+            {images.map((image, index) => (
+              <div key={index} className="flex items-center justify-center">
                 <img 
-                  key={index}
                   src={image.src} 
                   alt={image.alt} 
                   onClick={() => setSelectedImage(image.src)}
-                  className="w-full h-24 object-cover rounded-lg shadow-md hover:shadow-xl transition-all cursor-pointer hover:scale-105"
+                  className="max-h-full max-w-full object-contain rounded-lg hover:shadow-xl transition-all cursor-pointer hover:scale-105"
                 />
-              ))}
-            </div>
-
+              </div>
+            ))}
           </div>
         </div>
 
@@ -91,80 +116,7 @@ const Services = () => {
             </div>
           </div>
         )}
-      
-      <div className="container mx-auto px-4">
-        <div className="text-center">
-          <h2 className="text-xl md:text-2xl font-bold mt-16 mb-4 pb-4 border-b border-black">
-            線上訂餐 + All for One 送餐
-          </h2>
-          
-          {/* 三栏图片布局 */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8 max-w-3xl mx-auto">
-            {/* 第一栏 */}
-            <div className="flex flex-col items-center">
-              <img 
-                src="/images/landingpage/step_1.png" 
-                alt="步驟一" 
-                className="w-40 h-auto object-contain mb-2"
-              />
-              <p className="text-lg font-medium">Step 1</p>
-            </div>
-            
-            {/* 第二栏 */}
-            <div className="flex flex-col items-center justify-center">
-              <img 
-                src="/images/landingpage/step_2.png" 
-                alt="步驟二" 
-                className="w-40 h-auto object-contain mb-2"
-              />
-              <p className="text-lg font-medium">Step 2</p>
-            </div>
-            
-            {/* 第三栏 */}
-            <div className="flex flex-col items-center">
-              <img 
-                src="/images/landingpage/step_3.jpg" 
-                alt="步驟三" 
-                className="w-40 h-auto object-contain rounded-lg shadow-lg mb-2"
-              />
-              <p className="text-lg font-medium">Step 3</p>
-            </div>
-          </div>
-
-          {/* 文字说明区块 */}
-          <div className="mt-12 max-w-3xl mx-auto space-y-4 text-left">
-            <p className="text-xl text-gray-700">
-              Step1. 同仁透過Line進行線上點餐
-            </p>
-            <p className="text-xl text-gray-700">
-              Step2. BTW的送餐團隊穿梭各地，領取多間店家的美食餐點並送達機器補餐
-            </p>
-            <p className="text-xl text-gray-700">
-              Step3. 透過掃描QRCode或員工卡從智能熱食取餐機領取餐點
-            </p>
-          </div>
-
-          {/* 新增的相册区块 */}
-          <div className="mt-16 max-w-4xl mx-auto">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {allImages.map((image, index) => (
-                <div key={index} className="aspect-square flex items-center justify-center">
-                  <img 
-                    src={image.src} 
-                    alt={image.alt} 
-                    onClick={() => setSelectedImage(image.src)}
-                    className="max-h-full max-w-full object-contain rounded-lg hover:shadow-xl transition-all cursor-pointer hover:scale-105"
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>      
-      
-      
       </div>
-
     )
   }
 

@@ -24,7 +24,7 @@ const Restaurant = () => {
             {/* 优势列表 */}
             <div className="space-y-6">
               <div>
-                <p className="text-lg text-gray-700 leading-loose">浩華智能取餐正攜手百家餐廳，打造『線上訂餐・線下5秒取餐』的企業用餐新體驗！我們提供智能取餐機、穩定客源與高效配送系統，讓您的餐點直達企業員工手中，開拓全新市場商機。誠摯邀請您成為我們的服務夥伴，一起打造新型態餐飲服務，共創企業用餐的未來！</p>
+                <p className="text-base text-gray-700 leading-loose">浩華智能取餐正攜手百家餐廳，打造『線上訂餐・線下5秒取餐』的企業用餐新體驗！我們提供智能取餐機、穩定客源與高效配送系統，讓您的餐點直達企業員工手中，開拓全新市場商機。誠摯邀請您成為我們的服務夥伴，一起打造新型態餐飲服務，共創企業用餐的未來！</p>
               </div>
 
             </div>
@@ -36,7 +36,7 @@ const Restaurant = () => {
           <img 
             src="/images/landingpage/restaurant-logos.jpg" 
             alt="合作餐廳" 
-            className="w-full max-w-4xl mx-auto"
+            className="w-full max-w-6xl mx-auto"
           />
         </div>
     </div>

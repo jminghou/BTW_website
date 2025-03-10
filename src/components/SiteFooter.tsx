@@ -28,7 +28,7 @@ const SiteFooter = () => {
               <div className="border-b border-white w-full mb-3"></div>
               <div className="mt-4 space-y-1">
                 <p>統編：52414831</p>
-                <p>電話：02-27479628#33</p>
+                <p>電話：(02)2522-1167</p>
                 <p>地址：臺北市大同區太原路154之1號3樓</p>
                 <p>3 F., No. 154-1, Taiyuan Rd., Datong Dist., Taipei City 103020, Taiwan (R.O.C.)</p>
               </div>
