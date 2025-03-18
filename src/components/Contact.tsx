@@ -15,7 +15,7 @@ const Contact = () => {
                     className="mr-2" 
                     required 
                   />
-                  企業主
+                  企業餐飲承辦
                 </label>
                 <label className="flex items-center">
                   <input 
@@ -24,7 +24,7 @@ const Contact = () => {
                     value="餐廳" 
                     className="mr-2" 
                   />
-                  餐廳
+                  餐飲商家
                 </label>
                 <label className="flex items-center">
                   <input 

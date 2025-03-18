@@ -37,7 +37,7 @@ const Services02 = () => {
               <img 
                 src="/images/landingpage/step_2.png" 
                 alt="步驟二" 
-                className="w-40 h-auto object-contain mb-2"
+                className="w-72 h-auto object-contain mb-2"
               />
               <p className="text-base font-medium">Step 2</p>
             </div>
