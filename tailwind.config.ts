@@ -11,9 +11,17 @@ export default {
       colors: {
         background: "var(--background)",
         foreground: "var(--foreground)",
-        'logo-color': '#03b4c7',
+        'logo-color': '#00bed6',
         'custom-dark': '#0c2123',
-        
+      },
+      animation: {
+        'fade-in': 'fadeIn 0.5s ease-in-out',
+      },
+      keyframes: {
+        fadeIn: {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
       },
     },
   },

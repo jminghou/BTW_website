@@ -55,57 +55,60 @@ const About = () => {
             {/* 使用兩組相同的logo實現無縫滾動 */}
             <div className="flex absolute animate-marquee whitespace-nowrap">
               <div className="flex items-center justify-center mx-6 min-w-[128px]">
-                <img src="/images/logo_cus/fox.png" alt="客戶logo" className="h-32 w-auto object-contain" />
+                <img src="/images/logo_cus/fox.jpg" alt="客戶logo" className="h-40 w-auto object-contain" />
               </div>
               <div className="flex items-center justify-center mx-6 min-w-[128px]">
-                <img src="/images/logo_cus/ass.png" alt="客戶logo" className="h-32 w-auto object-contain" />
+                <img src="/images/logo_cus/ass.jpg" alt="客戶logo" className="h-40 w-auto object-contain" />
               </div>
               <div className="flex items-center justify-center mx-6 min-w-[128px]">
-                <img src="/images/logo_cus/ing.png" alt="客戶logo" className="h-32 w-auto object-contain" />
+                <img src="/images/logo_cus/ing.jpg" alt="客戶logo" className="h-40 w-auto object-contain" />
               </div>
               <div className="flex items-center justify-center mx-6 min-w-[128px]">
-                <img src="/images/logo_cus/lcfc.png" alt="客戶logo" className="h-32 w-auto object-contain" />
+                <img src="/images/logo_cus/lcfc.jpg" alt="客戶logo" className="h-40 w-auto object-contain" />
               </div>
               <div className="flex items-center justify-center mx-6 min-w-[128px]">
-                <img src="/images/logo_cus/med.png" alt="客戶logo" className="h-32 w-auto object-contain" />
+                <img src="/images/logo_cus/med.jpg" alt="客戶logo" className="h-40 w-auto object-contain" />
               </div>
               <div className="flex items-center justify-center mx-6 min-w-[128px]">
-                <img src="/images/logo_cus/win.png" alt="客戶logo" className="h-32 w-auto object-contain" />
+                <img src="/images/logo_cus/win.jpg" alt="客戶logo" className="h-40 w-auto object-contain" />
               </div>
               <div className="flex items-center justify-center mx-6 min-w-[128px]">
-                <img src="/images/logo_cus/cat.png" alt="客戶logo" className="h-32 w-auto object-contain" />
+                <img src="/images/logo_cus/cat.jpg" alt="客戶logo" className="h-40 w-auto object-contain" />
               </div>
               <div className="flex items-center justify-center mx-6 min-w-[128px]">
-                <img src="/images/logo_cus/sig.png" alt="客戶logo" className="h-32 w-auto object-contain" />
+                <img src="/images/logo_cus/sig.jpg" alt="客戶logo" className="h-40 w-auto object-contain" />
               </div>
               <div className="flex items-center justify-center mx-6 min-w-[128px]">
-                <img src="/images/logo_cus/lil.png" alt="客戶logo" className="h-32 w-auto object-contain" />
+                <img src="/images/logo_cus/lil.jpg" alt="客戶logo" className="h-40 w-auto object-contain" />
               </div>
               <div className="flex items-center justify-center mx-6 min-w-[128px]">
-                <img src="/images/logo_cus/ric.png" alt="客戶logo" className="h-32 w-auto object-contain" />
+                <img src="/images/logo_cus/ric.jpg" alt="客戶logo" className="h-40 w-auto object-contain" />
               </div>
               <div className="flex items-center justify-center mx-6 min-w-[128px]">
-                <img src="/images/logo_cus/vis.png" alt="客戶logo" className="h-32 w-auto object-contain" />
+                <img src="/images/logo_cus/vis.jpg" alt="客戶logo" className="h-40 w-auto object-contain" />
+              </div>
+              <div className="flex items-center justify-center mx-6 min-w-[128px]">
+                <img src="/images/logo_cus/tac.jpg" alt="客戶logo" className="h-40 w-auto object-contain" />
               </div>
               
               {/* 重複一組logo實現無縫效果 */}
               <div className="flex items-center justify-center mx-6 min-w-[128px]">
-                <img src="/images/logo_cus/fox.png" alt="客戶logo" className="h-32 w-auto object-contain" />
+                <img src="/images/logo_cus/fox.jpg" alt="客戶logo" className="h-40 w-auto object-contain" />
               </div>
               <div className="flex items-center justify-center mx-6 min-w-[128px]">
-                <img src="/images/logo_cus/ass.png" alt="客戶logo" className="h-32 w-auto object-contain" />
+                <img src="/images/logo_cus/ass.jpg" alt="客戶logo" className="h-40 w-auto object-contain" />
               </div>
               <div className="flex items-center justify-center mx-6 min-w-[128px]">
-                <img src="/images/logo_cus/ing.png" alt="客戶logo" className="h-32 w-auto object-contain" />
+                <img src="/images/logo_cus/ing.jpg" alt="客戶logo" className="h-40 w-auto object-contain" />
               </div>
               <div className="flex items-center justify-center mx-6 min-w-[128px]">
-                <img src="/images/logo_cus/lcfc.png" alt="客戶logo" className="h-32 w-auto object-contain" />
+                <img src="/images/logo_cus/lcfc.jpg" alt="客戶logo" className="h-40 w-auto object-contain" />
               </div>
               <div className="flex items-center justify-center mx-6 min-w-[128px]">
-                <img src="/images/logo_cus/med.png" alt="客戶logo" className="h-32 w-auto object-contain" />
+                <img src="/images/logo_cus/med.jpg" alt="客戶logo" className="h-40 w-auto object-contain" />
               </div>
               <div className="flex items-center justify-center mx-6 min-w-[128px]">
-                <img src="/images/logo_cus/win.png" alt="客戶logo" className="h-32 w-auto object-contain" />
+                <img src="/images/logo_cus/win.jpg" alt="客戶logo" className="h-40 w-auto object-contain" />
               </div>
             </div>
           </div>

@@ -32,11 +32,11 @@
         </div>
 
         {/* 底部餐厅logo图片 */}
-        <div className="mt-20 mb-8">
+        <div className="mt-8 mb-8">
           <img 
             src="/images/landingpage/map.jpg" 
             alt="合作餐廳" 
-            className="w-full max-w-4xl mx-auto"
+            className="w-full max-w-5xl mx-auto"
           />
         </div>
     </div>
