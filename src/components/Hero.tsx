@@ -6,8 +6,10 @@ import HeroGradient from './Hero_Gradient';
 const Hero = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const slides = [
-    '/images/ad/test01.jpg',
-    '/images/ad/test02.jpg'
+    '/images/ad/banner_01.jpg',
+    '/images/ad/banner_02.jpg',
+    '/images/ad/banner_03.jpg',
+    '/images/ad/banner_04.jpg'
   ];
 
   // 自動輪播
