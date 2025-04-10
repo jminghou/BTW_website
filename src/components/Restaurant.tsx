@@ -2,8 +2,17 @@
 
 import React from 'react';
 import RestaurantList from './Restaurant_list';
+import StandButton from './buttons/stand_buttons';
 
 const Restaurant = () => {
+  // 添加滚动到联系我们部分的函数
+  const scrollToContact = () => {
+    const contactSection = document.getElementById('contact');
+    if (contactSection) {
+      contactSection.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   return (
     <div className="container mx-auto px-6">
         
@@ -26,12 +35,21 @@ const Restaurant = () => {
             {/* 添加分隔线 */}
             <div className="w-full h-px bg-black mb-6"></div>
 
-            {/* 优势列表 */}
+            {/* 說明文字 */}
             <div className="space-y-6">
               <div>
                 <p className="text-base text-gray-700 leading-loose">浩華智能取餐正攜手百家餐廳，打造『線上訂餐・線下5秒取餐』的企業用餐新體驗！我們提供智能取餐機、穩定客源與高效配送系統，讓您的餐點直達企業員工手中，開拓全新市場商機。誠摯邀請您成為我們的服務夥伴，一起打造新型態餐飲服務，共創企業用餐的未來！</p>
               </div>
+              
+              {/* 添加标准按钮 */}
+              <div className="mt-6">
+                <StandButton 
+                  text="進一步洽談"
+                  onClick={scrollToContact}
+                />
+              </div>
             </div>
+            
           </div>
         </div>
 

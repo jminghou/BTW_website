@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import StandButton from './buttons/stand_buttons';
 
 const Services = () => {
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -63,18 +64,14 @@ const Services = () => {
 
             {/* 按钮区域移至右侧文字区 */}
             <div className="flex flex-col sm:flex-row gap-4 mt-8">
-              <button 
+              <StandButton 
+                text="服務流程"
                 onClick={scrollToServices02}
-                className="px-6 py-2 bg-[#00bed6] text-white rounded-lg hover:bg-[#ffb71b] transition-colors duration-300 shadow-md hover:shadow-lg text-base font-medium"
-              >
-                服務流程
-              </button>
-              <button 
+              />
+              <StandButton 
+                text="服務優勢"
                 onClick={scrollToAdvantages}
-                className="px-6 py-2 bg-[#00bed6] text-white rounded-lg hover:bg-[#ffb71b] transition-colors duration-300 shadow-md hover:shadow-lg text-base font-medium"
-              >
-                服務優勢
-              </button>
+              />
             </div>
           </div>
         </div>

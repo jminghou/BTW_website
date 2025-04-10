@@ -1,8 +1,38 @@
 'use client'
 
 import { useState, useEffect } from 'react';
+import HeroGradient from './Hero_Gradient';
 
 const Hero = () => {
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const slides = [
+    '/images/ad/test01.jpg',
+    '/images/ad/test02.jpg'
+  ];
+
+  // 自動輪播
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % slides.length);
+    }, 5000); // 每5秒切換一次
+    
+    return () => clearInterval(interval);
+  }, []);
+
+  // 手動切換到指定幻燈片
+  const goToSlide = (index: number) => {
+    setCurrentSlide(index);
+  };
+
+  // 前後導航
+  const prevSlide = () => {
+    setCurrentSlide((prev) => (prev - 1 + slides.length) % slides.length);
+  };
+
+  const nextSlide = () => {
+    setCurrentSlide((prev) => (prev + 1) % slides.length);
+  };
+
   const scrollToAbout = () => {
     const aboutSection = document.getElementById('about');
     if (aboutSection) {
@@ -12,32 +42,52 @@ const Hero = () => {
   };
 
   return (
-    <div className="relative h-screen bg-cover bg-center bg-no-repeat" 
-         style={{ backgroundImage: "url('/images/landingpage/banner_food.jpg')" }}>
-      {/* 黑色遮罩层 */}
-      <div className="absolute inset-0" style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)' }}></div>
-      
-      <div className="relative z-10 h-full flex items-center justify-center">
+    <HeroGradient>
+      <div className="flex items-center justify-center flex-grow">
         <div className="container mx-auto px-4">
-          <div className="flex flex-col items-center max-w-5xl mx-auto">
-            {/* 标题 */}
-            <div className="w-full text-center">
-              <h1 className="text-4xl lg:text-5xl font-bold mb-4 text-white">美味．觸手可及</h1>
-              <p className="text-xl mb-8 text-white">浩華智能餐飲｜企業高效用餐解決方案</p>
-              
-              {/* 下箭头符号 */}
-              <div 
-                className="text-white text-6xl cursor-pointer hover:text-logo-color transition-colors duration-300 mt-12 font-bold animate-bounce"
-                onClick={scrollToAbout}
-                style={{ textShadow: '0 0 10px rgba(255,255,255,0.5)' }}
-              >
-                ︾
-              </div>
+          {/* 輪播版位 */}
+          <div className="relative flex justify-center">
+            {/* 輪播圖片 - 使用淡入淡出效果 */}
+            <div className="relative w-full max-w-4xl h-auto">
+              {slides.map((slide, index) => (
+                <div 
+                  key={index} 
+                  className={`transition-opacity duration-1000 ease-in-out ${
+                    currentSlide === index ? 'opacity-100 z-10' : 'opacity-0 z-0'
+                  }`}
+                  style={{ position: index === currentSlide ? 'relative' : 'absolute', top: 0, left: 0, right: 0 }}
+                >
+                  <img 
+                    src={slide}
+                    alt={`廣告輪播 ${index + 1}`}
+                    className="w-full h-auto shadow-2xl rounded-3xl"
+                  />
+                </div>
+              ))}
             </div>
+          </div>
+          
+          {/* 指示器 */}
+          <div className="flex justify-center mt-4">
+            {slides.map((_, index) => (
+              <button
+                key={index}
+                className={`w-2 h-2 mx-1 rounded-full ${currentSlide === index ? 'bg-white' : 'bg-gray-300'}`}
+                onClick={() => goToSlide(index)}
+              />
+            ))}
+          </div>
+          
+          {/* 下箭头符号 */}
+          <div 
+            className="w-full text-center text-white text-6xl cursor-pointer hover:text-logo-color transition-colors duration-300 mt-8 font-bold animate-bounce"
+            onClick={scrollToAbout}
+          >
+            ︾
           </div>
         </div>
       </div>
-    </div>
+    </HeroGradient>
   )
 }
 
