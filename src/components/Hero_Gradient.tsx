@@ -9,7 +9,7 @@ const HeroGradient = ({ children }: HeroGradientProps) => {
     <div 
       className="relative h-screen flex flex-col justify-center" 
       style={{ 
-        background: 'linear-gradient(to bottom, #00bed6 0%, #00bed6 70%, white 100%)' 
+        background: 'linear-gradient(to bottom, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.7) 70%, rgba(255, 255, 255, 1) 100%)' 
       }}
     >
       {children}
