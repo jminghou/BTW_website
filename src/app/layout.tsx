@@ -49,7 +49,9 @@ export default function RootLayout({
   return (
     <html lang="zh-TW" className="scroll-smooth">
       <head>
-        <link rel="icon" href="/favicon.ico" />
+        <link rel="icon" href="/btw_bird_logo.ico" />
+        <link rel="apple-touch-icon" href="/btw_bird_logo.ico" />
+        <link rel="shortcut icon" href="/btw_bird_logo.ico" />
         {/* 其他 head 元素 */}
       </head>
       <body className={`${inter.className} antialiased`}>
