@@ -38,10 +38,10 @@ const Contact = () => {
       // 您需要在Email.js网站上注册并创建服务和模板
       // https://www.emailjs.com/
       const result = await emailjs.sendForm(
-        'YOUR_SERVICE_ID', // 替换为您的服务ID
-        'YOUR_TEMPLATE_ID', // 替换为您的模板ID
+        'service_a5sxzjy', // 替换为您的服务ID
+        'template_1uojjcj', // 替换为您的模板ID
         formRef.current!,
-        'YOUR_PUBLIC_KEY' // 替换为您的公共密钥
+        '#Jer$52414<hh>831' // 替换为您的公共密钥
       );
       
       if (result.text === 'OK') {
