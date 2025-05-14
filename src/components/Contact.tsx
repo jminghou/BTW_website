@@ -34,14 +34,25 @@ const Contact = () => {
     
     try {
       // 使用Email.js发送邮件
-      // 请替换为您的Email.js服务ID、模板ID和公共密钥
-      // 您需要在Email.js网站上注册并创建服务和模板
-      // https://www.emailjs.com/
-      const result = await emailjs.sendForm(
-        'service_a5sxzjy', // 替换为您的服务ID
-        'template_1uojjcj', // 替换为您的模板ID
-        formRef.current!,
-        '#Jer$52414<hh>831' // 替换为您的公共密钥
+      const result = await emailjs.send(
+        'service_a5sxzjy',
+        'template_1uojjcj',
+        {
+          identity: formData.identity,
+          user_name: formData.user_name,
+          title: formData.title,
+          user_email: formData.user_email,
+          phone: formData.phone,
+          message: formData.message,
+          // 设置发件人名称为用户填写的名称
+          from_name: formData.user_name,
+          // 收件人设置为service@haohuagroup.com.tw（与发件人相同）
+          to_name: '客服團隊',
+          to_email: 'service@haohuagroup.com.tw',
+          // 设置回复地址为用户的邮箱，方便直接回复
+          reply_to: formData.user_email
+        },
+        'AOvvrQejq7rqpRw--'
       );
       
       if (result.text === 'OK') {
@@ -78,8 +89,6 @@ const Contact = () => {
           </div>
         )}
         <form ref={formRef} className="space-y-4" onSubmit={handleSubmit}>
-          <input type="hidden" name="to_email" value="service@haohuagroup.com.tw" />
-          
           <div className="mb-2">
             <p className="mb-2">請問您身份的代表是？</p>
             <div className="flex space-x-6">
