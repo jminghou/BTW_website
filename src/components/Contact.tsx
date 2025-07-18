@@ -33,8 +33,20 @@ const Contact = () => {
     setSubmitStatus(null);
     
     try {
-      // 使用Email.js发送邮件
-      const result = await emailjs.send(
+      // 1. 儲存到資料庫
+      const dbResponse = await fetch('/api/contacts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+
+      const dbResult = await dbResponse.json();
+      console.log('資料庫儲存結果：', dbResult);
+
+      // 2. 使用Email.js发送邮件
+      const emailResult = await emailjs.send(
         'service_a5sxzjy',
         'template_1uojjcj',
         {
@@ -55,8 +67,13 @@ const Contact = () => {
         'AOvvrQejq7rqpRw--'
       );
       
-      if (result.text === 'OK') {
-        setSubmitStatus({ success: true, message: '您的訊息已成功送出，我們會盡快回覆您！' });
+      if (emailResult.text === 'OK') {
+        setSubmitStatus({ 
+          success: true, 
+          message: dbResult.success 
+            ? '您的訊息已成功送出並儲存，我們會盡快回覆您！' 
+            : '您的訊息已成功送出，我們會盡快回覆您！（資料儲存可能失敗）'
+        });
         setFormData({
           identity: '',
           user_name: '',
@@ -69,7 +86,7 @@ const Contact = () => {
           formRef.current.reset();
         }
       } else {
-        throw new Error('提交失敗');
+        throw new Error('郵件發送失敗');
       }
     } catch (error) {
       setSubmitStatus({ success: false, message: '提交失敗，請稍後再試或直接聯繫我們。' });
