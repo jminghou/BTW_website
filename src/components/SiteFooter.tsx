@@ -36,6 +36,10 @@ const SiteFooter = () => {
           </div>
         </div>
         
+        {/* 食品登錄字號 */}
+        <div className="mt-2 pt-1 text-right text-gray-300 text-sm">
+          <p>食品登錄字號：A-152414831-00000-6</p>
+        </div>
         {/* 版权声明 */}
         <div className="mt-2 pt-1 text-right text-gray-400 text-sm">
           <p>© {new Date().getFullYear()} HAOHUA Tech. Co., LTD. All Rights Reserved.</p>

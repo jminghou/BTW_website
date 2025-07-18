@@ -66,20 +66,23 @@ const RestaurantList = () => {
 
   // 添加状态来控制是否显示更多餐厅
   const [showMore, setShowMore] = useState(false);
+  
+  // 添加状态來追蹤哪些圖片被點擊變成彩色
+  const [coloredImages, setColoredImages] = useState<Set<string>>(new Set());
 
-  // 将全台连锁餐厅logo分成两部分：前12个(前2排)和后6个(最后一排)
+  // 將全台连锁餐厅logo分成两部分：前12个(前2排)和后6个(最后一排)
   const firstTwoRows = restaurantLogos.slice(0, 12);
   const lastRow = restaurantLogos.slice(12);
 
-  // 将台北餐厅logo分成两排，每排6个
+  // 將台北餐厅logo分成两排，每排6个
   const taipeiFirstRow = taipeiLogos.slice(0, 6);
   const taipeiSecondRow = taipeiLogos.slice(6, 12);
 
-  // 将桃园餐厅logo分成两排，每排6个（如果不够12个，第二排会不满）
+  // 將桃园餐厅logo分成两排，每排6个（如果不够12个，第二排会不满）
   const tyuFirstRow = tyuLogos.slice(0, 6);
   const tyuSecondRow = tyuLogos.slice(6);
 
-  // 将新竹餐厅logo分成两排，每排6个（如果不够12个，第二排会不满）
+  // 將新竹餐厅logo分成两排，每排6个（如果不够12个，第二排会不满）
   const hsFirstRow = hsLogos.slice(0, 6);
   const hsSecondRow = hsLogos.slice(6);
 
@@ -91,21 +94,49 @@ const RestaurantList = () => {
     }
   };
 
+  // 處理圖片點擊，切換彩色狀態
+  const handleImageClick = (imageId: string, isSpecialAction?: boolean) => {
+    if (isSpecialAction) {
+      scrollToContact();
+      return;
+    }
+    
+    setColoredImages(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(imageId)) {
+        newSet.delete(imageId);
+      } else {
+        newSet.add(imageId);
+      }
+      return newSet;
+    });
+  };
+
   return (
     <div className="mt-12 mb-12">
       <h3 className="text-2xl font-bold text-center mb-8">目前合作餐廳 (全台連鎖)</h3>
       
       {/* 显示前两排(12个)餐厅logo */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 max-w-6xl mx-auto">
-        {firstTwoRows.map((logo, index) => (
-          <div key={index} className="flex items-center justify-center p-2 bg-white rounded-lg shadow hover:shadow-md transition-shadow overflow-hidden">
-            <img 
-              src={logo} 
-              alt={`合作餐廳 ${index + 1}`} 
-              className="w-full h-auto object-contain transition-transform duration-300 hover:scale-110"
-            />
-          </div>
-        ))}
+        {firstTwoRows.map((logo, index) => {
+          const imageId = `main-${index}`;
+          const isColored = coloredImages.has(imageId);
+          return (
+            <div 
+              key={index} 
+              className="flex items-center justify-center p-2 bg-white rounded-lg shadow hover:shadow-md transition-shadow overflow-hidden cursor-pointer"
+              onClick={() => handleImageClick(imageId)}
+            >
+              <img 
+                src={logo} 
+                alt={`合作餐廳 ${index + 1}`} 
+                className={`w-full h-auto object-contain transition-all duration-300 hover:scale-110 ${
+                  isColored ? 'filter-none opacity-100' : 'filter grayscale opacity-75 hover:opacity-100 hover:grayscale-0'
+                }`}
+              />
+            </div>
+          );
+        })}
       </div>
       
       {/* 显示"更多餐厅"按钮 */}
@@ -131,15 +162,25 @@ const RestaurantList = () => {
       {showMore && (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 max-w-6xl mx-auto mt-6 animate-fade-in">
-            {lastRow.map((logo, index) => (
-              <div key={index + 12} className="flex items-center justify-center p-2 bg-white rounded-lg shadow hover:shadow-md transition-shadow overflow-hidden">
-                <img 
-                  src={logo} 
-                  alt={`合作餐廳 ${index + 13}`} 
-                  className="w-full h-auto object-contain transition-transform duration-300 hover:scale-110"
-                />
-              </div>
-            ))}
+            {lastRow.map((logo, index) => {
+              const imageId = `main-${index + 12}`;
+              const isColored = coloredImages.has(imageId);
+              return (
+                <div 
+                  key={index + 12} 
+                  className="flex items-center justify-center p-2 bg-white rounded-lg shadow hover:shadow-md transition-shadow overflow-hidden cursor-pointer"
+                  onClick={() => handleImageClick(imageId)}
+                >
+                  <img 
+                    src={logo} 
+                    alt={`合作餐廳 ${index + 13}`} 
+                    className={`w-full h-auto object-contain transition-all duration-300 hover:scale-110 ${
+                      isColored ? 'filter-none opacity-100' : 'filter grayscale opacity-75 hover:opacity-100 hover:grayscale-0'
+                    }`}
+                  />
+                </div>
+              );
+            })}
           </div>
           
           {/* 台北合作餐厅标题 */}
@@ -147,37 +188,54 @@ const RestaurantList = () => {
           
           {/* 台北餐厅logo第一排 */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 max-w-6xl mx-auto animate-fade-in">
-            {taipeiFirstRow.map((logo, index) => (
-              <div key={`taipei-${index}`} className="flex items-center justify-center p-2 bg-white rounded-lg shadow hover:shadow-md transition-shadow overflow-hidden">
-                <img 
-                  src={logo} 
-                  alt={`台北合作餐廳 ${index + 1}`} 
-                  className="w-full h-auto object-contain transition-transform duration-300 hover:scale-110"
-                />
-              </div>
-            ))}
+            {taipeiFirstRow.map((logo, index) => {
+              const imageId = `taipei-${index}`;
+              const isColored = coloredImages.has(imageId);
+              return (
+                <div 
+                  key={`taipei-${index}`} 
+                  className="flex items-center justify-center p-2 bg-white rounded-lg shadow hover:shadow-md transition-shadow overflow-hidden cursor-pointer"
+                  onClick={() => handleImageClick(imageId)}
+                >
+                  <img 
+                    src={logo} 
+                    alt={`台北合作餐廳 ${index + 1}`} 
+                    className={`w-full h-auto object-contain transition-all duration-300 hover:scale-110 ${
+                      isColored ? 'filter-none opacity-100' : 'filter grayscale opacity-75 hover:opacity-100 hover:grayscale-0'
+                    }`}
+                  />
+                </div>
+              );
+            })}
           </div>
           
           {/* 台北餐厅logo第二排 */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 max-w-6xl mx-auto mt-4 animate-fade-in">
-            {taipeiSecondRow.map((logo, index) => (
-              <div 
-                key={`taipei-${index + 6}`} 
-                className={`flex items-center justify-center p-2 bg-white rounded-lg shadow hover:shadow-md transition-shadow overflow-hidden ${index === 5 ? 'cursor-pointer relative group' : ''}`}
-                onClick={index === 5 ? scrollToContact : undefined}
-              >
-                <img 
-                  src={logo} 
-                  alt={index === 5 ? '加入我們' : `台北合作餐廳 ${index + 7}`} 
-                  className="w-full h-auto object-contain transition-transform duration-300 hover:scale-110"
-                />
-                {index === 5 && (
-                  <div className="absolute inset-0 bg-[#ffb71b] bg-opacity-0 group-hover:bg-opacity-30 flex items-center justify-center transition-all duration-300 opacity-0 group-hover:opacity-100">
-                    <span className="text-black font-semibold text-2xl">台北餐廳</span>
-                  </div>
-                )}
-              </div>
-            ))}
+            {taipeiSecondRow.map((logo, index) => {
+              const imageId = `taipei-${index + 6}`;
+              const isColored = coloredImages.has(imageId);
+              const isPlusIcon = index === 5;
+              return (
+                <div 
+                  key={`taipei-${index + 6}`} 
+                  className={`flex items-center justify-center p-2 bg-white rounded-lg shadow hover:shadow-md transition-shadow overflow-hidden cursor-pointer ${isPlusIcon ? 'relative group' : ''}`}
+                  onClick={() => handleImageClick(imageId, isPlusIcon)}
+                >
+                  <img 
+                    src={logo} 
+                    alt={isPlusIcon ? '加入我們' : `台北合作餐廳 ${index + 7}`} 
+                    className={`w-full h-auto object-contain transition-all duration-300 hover:scale-110 ${
+                      isPlusIcon ? 'filter-none' : (isColored ? 'filter-none opacity-100' : 'filter grayscale opacity-75 hover:opacity-100 hover:grayscale-0')
+                    }`}
+                  />
+                  {isPlusIcon && (
+                    <div className="absolute inset-0 bg-[#ffb71b] bg-opacity-0 group-hover:bg-opacity-30 flex items-center justify-center transition-all duration-300 opacity-0 group-hover:opacity-100">
+                      <span className="text-black font-semibold text-2xl">台北餐廳</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           {/* 桃园合作餐厅标题 */}
@@ -185,37 +243,54 @@ const RestaurantList = () => {
           
           {/* 桃园餐厅logo第一排 */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 max-w-6xl mx-auto animate-fade-in">
-            {tyuFirstRow.map((logo, index) => (
-              <div key={`tyu-${index}`} className="flex items-center justify-center p-2 bg-white rounded-lg shadow hover:shadow-md transition-shadow overflow-hidden">
-                <img 
-                  src={logo} 
-                  alt={`桃園合作餐廳 ${index + 1}`} 
-                  className="w-full h-auto object-contain transition-transform duration-300 hover:scale-110"
-                />
-              </div>
-            ))}
+            {tyuFirstRow.map((logo, index) => {
+              const imageId = `tyu-${index}`;
+              const isColored = coloredImages.has(imageId);
+              return (
+                <div 
+                  key={`tyu-${index}`} 
+                  className="flex items-center justify-center p-2 bg-white rounded-lg shadow hover:shadow-md transition-shadow overflow-hidden cursor-pointer"
+                  onClick={() => handleImageClick(imageId)}
+                >
+                  <img 
+                    src={logo} 
+                    alt={`桃園合作餐廳 ${index + 1}`} 
+                    className={`w-full h-auto object-contain transition-all duration-300 hover:scale-110 ${
+                      isColored ? 'filter-none opacity-100' : 'filter grayscale opacity-75 hover:opacity-100 hover:grayscale-0'
+                    }`}
+                  />
+                </div>
+              );
+            })}
           </div>
           
           {/* 桃园餐厅logo第二排 */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 max-w-6xl mx-auto mt-4 animate-fade-in">
-            {tyuSecondRow.map((logo, index) => (
-              <div 
-                key={`tyu-${index + 6}`} 
-                className={`flex items-center justify-center p-2 bg-white rounded-lg shadow hover:shadow-md transition-shadow overflow-hidden ${logo.includes('plus.png') ? 'cursor-pointer relative group' : ''}`}
-                onClick={logo.includes('plus.png') ? scrollToContact : undefined}
-              >
-                <img 
-                  src={logo} 
-                  alt={logo.includes('plus.png') ? '加入我們' : `桃園合作餐廳 ${index + 7}`} 
-                  className="w-full h-auto object-contain transition-transform duration-300 hover:scale-110"
-                />
-                {logo.includes('plus.png') && (
-                  <div className="absolute inset-0 bg-[#ffb71b] bg-opacity-0 group-hover:bg-opacity-30 flex items-center justify-center transition-all duration-300 opacity-0 group-hover:opacity-100">
-                    <span className="text-black font-semibold text-2xl">桃園餐廳</span>
-                  </div>
-                )}
-              </div>
-            ))}
+            {tyuSecondRow.map((logo, index) => {
+              const imageId = `tyu-${index + 6}`;
+              const isColored = coloredImages.has(imageId);
+              const isPlusIcon = logo.includes('plus.png');
+              return (
+                <div 
+                  key={`tyu-${index + 6}`} 
+                  className={`flex items-center justify-center p-2 bg-white rounded-lg shadow hover:shadow-md transition-shadow overflow-hidden cursor-pointer ${isPlusIcon ? 'relative group' : ''}`}
+                  onClick={() => handleImageClick(imageId, isPlusIcon)}
+                >
+                  <img 
+                    src={logo} 
+                    alt={isPlusIcon ? '加入我們' : `桃園合作餐廳 ${index + 7}`} 
+                    className={`w-full h-auto object-contain transition-all duration-300 hover:scale-110 ${
+                      isPlusIcon ? 'filter-none' : (isColored ? 'filter-none opacity-100' : 'filter grayscale opacity-75 hover:opacity-100 hover:grayscale-0')
+                    }`}
+                  />
+                  {isPlusIcon && (
+                    <div className="absolute inset-0 bg-[#ffb71b] bg-opacity-0 group-hover:bg-opacity-30 flex items-center justify-center transition-all duration-300 opacity-0 group-hover:opacity-100">
+                      <span className="text-black font-semibold text-2xl">桃園餐廳</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           {/* 新竹合作餐厅标题 */}
@@ -223,37 +298,54 @@ const RestaurantList = () => {
           
           {/* 新竹餐厅logo第一排 */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 max-w-6xl mx-auto animate-fade-in">
-            {hsFirstRow.map((logo, index) => (
-              <div key={`hs-${index}`} className="flex items-center justify-center p-2 bg-white rounded-lg shadow hover:shadow-md transition-shadow overflow-hidden">
-                <img 
-                  src={logo} 
-                  alt={`新竹合作餐廳 ${index + 1}`} 
-                  className="w-full h-auto object-contain transition-transform duration-300 hover:scale-110"
-                />
-              </div>
-            ))}
+            {hsFirstRow.map((logo, index) => {
+              const imageId = `hs-${index}`;
+              const isColored = coloredImages.has(imageId);
+              return (
+                <div 
+                  key={`hs-${index}`} 
+                  className="flex items-center justify-center p-2 bg-white rounded-lg shadow hover:shadow-md transition-shadow overflow-hidden cursor-pointer"
+                  onClick={() => handleImageClick(imageId)}
+                >
+                  <img 
+                    src={logo} 
+                    alt={`新竹合作餐廳 ${index + 1}`} 
+                    className={`w-full h-auto object-contain transition-all duration-300 hover:scale-110 ${
+                      isColored ? 'filter-none opacity-100' : 'filter grayscale opacity-75 hover:opacity-100 hover:grayscale-0'
+                    }`}
+                  />
+                </div>
+              );
+            })}
           </div>
           
           {/* 新竹餐厅logo第二排 */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 max-w-6xl mx-auto mt-4 animate-fade-in">
-            {hsSecondRow.map((logo, index) => (
-              <div 
-                key={`hs-${index + 6}`} 
-                className={`flex items-center justify-center p-2 bg-white rounded-lg shadow hover:shadow-md transition-shadow overflow-hidden ${logo.includes('plus.png') ? 'cursor-pointer relative group' : ''}`}
-                onClick={logo.includes('plus.png') ? scrollToContact : undefined}
-              >
-                <img 
-                  src={logo} 
-                  alt={logo.includes('plus.png') ? '加入我們' : `新竹合作餐廳 ${index + 7}`} 
-                  className="w-full h-auto object-contain transition-transform duration-300 hover:scale-110"
-                />
-                {logo.includes('plus.png') && (
-                  <div className="absolute inset-0 bg-[#ffb71b] bg-opacity-0 group-hover:bg-opacity-30 flex items-center justify-center transition-all duration-300 opacity-0 group-hover:opacity-100">
-                    <span className="text-black font-semibold text-2xl">新竹餐廳</span>
-                  </div>
-                )}
-              </div>
-            ))}
+            {hsSecondRow.map((logo, index) => {
+              const imageId = `hs-${index + 6}`;
+              const isColored = coloredImages.has(imageId);
+              const isPlusIcon = logo.includes('plus.png');
+              return (
+                <div 
+                  key={`hs-${index + 6}`} 
+                  className={`flex items-center justify-center p-2 bg-white rounded-lg shadow hover:shadow-md transition-shadow overflow-hidden cursor-pointer ${isPlusIcon ? 'relative group' : ''}`}
+                  onClick={() => handleImageClick(imageId, isPlusIcon)}
+                >
+                  <img 
+                    src={logo} 
+                    alt={isPlusIcon ? '加入我們' : `新竹合作餐廳 ${index + 7}`} 
+                    className={`w-full h-auto object-contain transition-all duration-300 hover:scale-110 ${
+                      isPlusIcon ? 'filter-none' : (isColored ? 'filter-none opacity-100' : 'filter grayscale opacity-75 hover:opacity-100 hover:grayscale-0')
+                    }`}
+                  />
+                  {isPlusIcon && (
+                    <div className="absolute inset-0 bg-[#ffb71b] bg-opacity-0 group-hover:bg-opacity-30 flex items-center justify-center transition-all duration-300 opacity-0 group-hover:opacity-100">
+                      <span className="text-black font-semibold text-2xl">新竹餐廳</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           {/* 台中合作餐厅标题 */}
@@ -261,24 +353,31 @@ const RestaurantList = () => {
           
           {/* 台中餐厅logo单排 */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 max-w-6xl mx-auto animate-fade-in">
-            {tchLogos.map((logo, index) => (
-              <div 
-                key={`tch-${index}`} 
-                className={`flex items-center justify-center p-2 bg-white rounded-lg shadow hover:shadow-md transition-shadow overflow-hidden ${logo.includes('plus.png') ? 'cursor-pointer relative group' : ''}`}
-                onClick={logo.includes('plus.png') ? scrollToContact : undefined}
-              >
-                <img 
-                  src={logo} 
-                  alt={logo.includes('plus.png') ? '加入我們' : `台中合作餐廳 ${index + 1}`} 
-                  className="w-full h-auto object-contain transition-transform duration-300 hover:scale-110"
-                />
-                {logo.includes('plus.png') && (
-                  <div className="absolute inset-0 bg-[#ffb71b] bg-opacity-0 group-hover:bg-opacity-30 flex items-center justify-center transition-all duration-300 opacity-0 group-hover:opacity-100">
-                    <span className="text-black font-semibold text-2xl">台中餐廳</span>
-                  </div>
-                )}
-              </div>
-            ))}
+            {tchLogos.map((logo, index) => {
+              const imageId = `tch-${index}`;
+              const isColored = coloredImages.has(imageId);
+              const isPlusIcon = logo.includes('plus.png');
+              return (
+                <div 
+                  key={`tch-${index}`} 
+                  className={`flex items-center justify-center p-2 bg-white rounded-lg shadow hover:shadow-md transition-shadow overflow-hidden cursor-pointer ${isPlusIcon ? 'relative group' : ''}`}
+                  onClick={() => handleImageClick(imageId, isPlusIcon)}
+                >
+                  <img 
+                    src={logo} 
+                    alt={isPlusIcon ? '加入我們' : `台中合作餐廳 ${index + 1}`} 
+                    className={`w-full h-auto object-contain transition-all duration-300 hover:scale-110 ${
+                      isPlusIcon ? 'filter-none' : (isColored ? 'filter-none opacity-100' : 'filter grayscale opacity-75 hover:opacity-100 hover:grayscale-0')
+                    }`}
+                  />
+                  {isPlusIcon && (
+                    <div className="absolute inset-0 bg-[#ffb71b] bg-opacity-0 group-hover:bg-opacity-30 flex items-center justify-center transition-all duration-300 opacity-0 group-hover:opacity-100">
+                      <span className="text-black font-semibold text-2xl">台中餐廳</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           {/* 台南合作餐厅标题 */}
@@ -286,24 +385,31 @@ const RestaurantList = () => {
           
           {/* 台南餐厅logo单排 */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 max-w-6xl mx-auto animate-fade-in">
-            {tnaLogos.map((logo, index) => (
-              <div 
-                key={`tna-${index}`} 
-                className={`flex items-center justify-center p-2 bg-white rounded-lg shadow hover:shadow-md transition-shadow overflow-hidden ${logo.includes('plus.png') ? 'cursor-pointer relative group' : ''}`}
-                onClick={logo.includes('plus.png') ? scrollToContact : undefined}
-              >
-                <img 
-                  src={logo} 
-                  alt={logo.includes('plus.png') ? '加入我們' : `台南合作餐廳 ${index + 1}`} 
-                  className="w-full h-auto object-contain transition-transform duration-300 hover:scale-110"
-                />
-                {logo.includes('plus.png') && (
-                  <div className="absolute inset-0 bg-[#ffb71b] bg-opacity-0 group-hover:bg-opacity-30 flex items-center justify-center transition-all duration-300 opacity-0 group-hover:opacity-100">
-                    <span className="text-black font-semibold text-2xl">台南餐廳</span>
-                  </div>
-                )}
-              </div>
-            ))}
+            {tnaLogos.map((logo, index) => {
+              const imageId = `tna-${index}`;
+              const isColored = coloredImages.has(imageId);
+              const isPlusIcon = logo.includes('plus.png');
+              return (
+                <div 
+                  key={`tna-${index}`} 
+                  className={`flex items-center justify-center p-2 bg-white rounded-lg shadow hover:shadow-md transition-shadow overflow-hidden cursor-pointer ${isPlusIcon ? 'relative group' : ''}`}
+                  onClick={() => handleImageClick(imageId, isPlusIcon)}
+                >
+                  <img 
+                    src={logo} 
+                    alt={isPlusIcon ? '加入我們' : `台南合作餐廳 ${index + 1}`} 
+                    className={`w-full h-auto object-contain transition-all duration-300 hover:scale-110 ${
+                      isPlusIcon ? 'filter-none' : (isColored ? 'filter-none opacity-100' : 'filter grayscale opacity-75 hover:opacity-100 hover:grayscale-0')
+                    }`}
+                  />
+                  {isPlusIcon && (
+                    <div className="absolute inset-0 bg-[#ffb71b] bg-opacity-0 group-hover:bg-opacity-30 flex items-center justify-center transition-all duration-300 opacity-0 group-hover:opacity-100">
+                      <span className="text-black font-semibold text-2xl">台南餐廳</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           {/* 高雄合作餐厅标题 */}
@@ -311,24 +417,31 @@ const RestaurantList = () => {
           
           {/* 高雄餐厅logo单排 */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 max-w-6xl mx-auto animate-fade-in">
-            {kaoLogos.map((logo, index) => (
-              <div 
-                key={`kao-${index}`} 
-                className={`flex items-center justify-center p-2 bg-white rounded-lg shadow hover:shadow-md transition-shadow overflow-hidden ${logo.includes('plus.png') ? 'cursor-pointer relative group' : ''}`}
-                onClick={logo.includes('plus.png') ? scrollToContact : undefined}
-              >
-                <img 
-                  src={logo} 
-                  alt={logo.includes('plus.png') ? '加入我們' : `高雄合作餐廳 ${index + 1}`} 
-                  className="w-full h-auto object-contain transition-transform duration-300 hover:scale-110"
-                />
-                {logo.includes('plus.png') && (
-                  <div className="absolute inset-0 bg-[#ffb71b] bg-opacity-0 group-hover:bg-opacity-30 flex items-center justify-center transition-all duration-300 opacity-0 group-hover:opacity-100">
-                    <span className="text-black font-semibold text-2xl">高雄餐廳</span>
-                  </div>
-                )}
-              </div>
-            ))}
+            {kaoLogos.map((logo, index) => {
+              const imageId = `kao-${index}`;
+              const isColored = coloredImages.has(imageId);
+              const isPlusIcon = logo.includes('plus.png');
+              return (
+                <div 
+                  key={`kao-${index}`} 
+                  className={`flex items-center justify-center p-2 bg-white rounded-lg shadow hover:shadow-md transition-shadow overflow-hidden cursor-pointer ${isPlusIcon ? 'relative group' : ''}`}
+                  onClick={() => handleImageClick(imageId, isPlusIcon)}
+                >
+                  <img 
+                    src={logo} 
+                    alt={isPlusIcon ? '加入我們' : `高雄合作餐廳 ${index + 1}`} 
+                    className={`w-full h-auto object-contain transition-all duration-300 hover:scale-110 ${
+                      isPlusIcon ? 'filter-none' : (isColored ? 'filter-none opacity-100' : 'filter grayscale opacity-75 hover:opacity-100 hover:grayscale-0')
+                    }`}
+                  />
+                  {isPlusIcon && (
+                    <div className="absolute inset-0 bg-[#ffb71b] bg-opacity-0 group-hover:bg-opacity-30 flex items-center justify-center transition-all duration-300 opacity-0 group-hover:opacity-100">
+                      <span className="text-black font-semibold text-2xl">高雄餐廳</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </>
       )}
