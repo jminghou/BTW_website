@@ -95,6 +95,32 @@ export async function getContacts() {
   }
 }
 
+// 刪除指定 ID 的聯絡表單資料
+export async function deleteContact(id: number) {
+  try {
+    // 先檢查資料是否存在
+    const checkResult = await sql`
+      SELECT id FROM contacts WHERE id = ${id};
+    `;
+    
+    if (checkResult.rows.length === 0) {
+      return { success: false, error: '找不到指定的聯絡表單資料' };
+    }
+
+    // 執行刪除
+    const result = await sql`
+      DELETE FROM contacts WHERE id = ${id}
+      RETURNING id;
+    `;
+
+    console.log('聯絡表單資料刪除成功！', result.rows[0]);
+    return { success: true, data: result.rows[0] };
+  } catch (error) {
+    console.error('刪除聯絡表單資料時發生錯誤：', error);
+    return { success: false, error: error };
+  }
+}
+
 // 儲存電子報訂閱
 export async function saveNewsletterSubscription(email: string, name?: string) {
   try {
