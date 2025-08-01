@@ -77,29 +77,29 @@ export default function EmployeeInfo() {
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'high': return 'bg-red-100 text-red-800 border-red-200';
-      case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'low': return 'bg-green-100 text-green-800 border-green-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'high': return 'bg-red-50 text-red-700 border-red-200';
+      case 'medium': return 'bg-yellow-50 text-yellow-700 border-yellow-200';
+      case 'low': return 'bg-green-50 text-green-700 border-green-200';
+      default: return 'bg-gray-50 text-gray-700 border-gray-200';
     }
   };
 
   const getPriorityText = (priority: string) => {
     switch (priority) {
-      case 'high': return '🔴 重要';
-      case 'medium': return '🟡 普通';
-      case 'low': return '🟢 一般';
-      default: return '⚪ 未分類';
+      case 'high': return '重要';
+      case 'medium': return '普通';
+      case 'low': return '一般';
+      default: return '未分類';
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 py-16">
+    <div className="min-h-screen bg-gray-50 py-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold text-gray-900 mb-4">
-            👥 員工資訊中心
+            員工資訊中心
           </h2>
           <p className="text-lg text-gray-600">
             公司政策、公告事項、聯絡資訊一站式查詢
@@ -108,24 +108,23 @@ export default function EmployeeInfo() {
 
         {/* Announcements */}
         <div className="mb-12">
-          <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-            <span className="mr-3">📢</span>
+          <h3 className="text-2xl font-bold text-gray-900 mb-6">
             最新公告
           </h3>
-          <div className="grid gap-4">
+          <div className="space-y-4">
             {announcements.map((announcement) => (
-              <div key={announcement.id} className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+              <div key={announcement.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
+                    <div className="flex items-center gap-3 mb-3">
                       <h4 className="text-lg font-semibold text-gray-900">
                         {announcement.title}
                       </h4>
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full border ${getPriorityColor(announcement.priority)}`}>
+                      <span className={`px-3 py-1 text-xs font-medium rounded-full border ${getPriorityColor(announcement.priority)}`}>
                         {getPriorityText(announcement.priority)}
                       </span>
                     </div>
-                    <p className="text-gray-600 mb-2">
+                    <p className="text-gray-600 mb-3 leading-relaxed">
                       {announcement.content}
                     </p>
                     <p className="text-sm text-gray-500">
@@ -140,21 +139,19 @@ export default function EmployeeInfo() {
 
         {/* Policies */}
         <div className="mb-12">
-          <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-            <span className="mr-3">📋</span>
+          <h3 className="text-2xl font-bold text-gray-900 mb-6">
             公司政策
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {policies.map((policy, index) => (
-              <div key={index} className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
-                <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                  <span className="mr-2 text-2xl">{policy.icon}</span>
+              <div key={index} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+                <h4 className="text-lg font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200">
                   {policy.title}
                 </h4>
-                <ul className="space-y-2">
+                <ul className="space-y-3">
                   {policy.items.map((item, itemIndex) => (
                     <li key={itemIndex} className="text-gray-600 flex items-start">
-                      <span className="mr-2 text-blue-500">•</span>
+                      <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full mt-2 mr-3 flex-shrink-0"></div>
                       {item}
                     </li>
                   ))}
@@ -166,25 +163,27 @@ export default function EmployeeInfo() {
 
         {/* Department Contacts */}
         <div className="mb-12">
-          <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-            <span className="mr-3">📞</span>
+          <h3 className="text-2xl font-bold text-gray-900 mb-6">
             部門聯絡方式
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {contacts.map((contact, index) => (
-              <div key={index} className="bg-white rounded-lg shadow-md p-6 text-center hover:shadow-lg transition-shadow">
-                <h4 className="text-lg font-semibold text-gray-900 mb-3">
+              <div key={index} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 text-center hover:shadow-md transition-shadow">
+                <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <div className="w-6 h-6 bg-cyan-500 rounded-full"></div>
+                </div>
+                <h4 className="text-lg font-semibold text-gray-900 mb-4">
                   {contact.department}
                 </h4>
-                <div className="space-y-2 text-sm text-gray-600">
+                <div className="space-y-3 text-sm">
                   <p className="font-medium text-gray-800">{contact.contact}</p>
                   <p>
-                    <a href={`tel:${contact.phone.replace(/[^0-9]/g, '')}`} className="text-blue-600 hover:text-blue-800">
+                    <a href={`tel:${contact.phone.replace(/[^0-9]/g, '')}`} className="text-cyan-600 hover:text-cyan-700 transition-colors">
                       {contact.phone}
                     </a>
                   </p>
                   <p>
-                    <a href={`mailto:${contact.email}`} className="text-blue-600 hover:text-blue-800">
+                    <a href={`mailto:${contact.email}`} className="text-cyan-600 hover:text-cyan-700 transition-colors">
                       {contact.email}
                     </a>
                   </p>
@@ -195,28 +194,40 @@ export default function EmployeeInfo() {
         </div>
 
         {/* Quick Links */}
-        <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg p-8 text-white">
-          <h3 className="text-2xl font-bold mb-6 text-center">🔗 快速連結</h3>
+        <div className="bg-gradient-to-r from-gray-800 to-gray-900 rounded-lg p-8 text-white">
+          <h3 className="text-2xl font-bold mb-6 text-center">快速連結</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <a
               href="#"
-              className="bg-white/20 hover:bg-white/30 rounded-lg p-4 text-center transition-colors"
+              className="bg-white/10 hover:bg-white/20 rounded-lg p-6 text-center transition-colors group"
             >
-              <div className="text-2xl mb-2">📝</div>
+              <div className="w-12 h-12 bg-cyan-500 rounded-lg flex items-center justify-center mx-auto mb-4 group-hover:bg-cyan-400 transition-colors">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
               <div className="font-medium">線上請假系統</div>
             </a>
             <a
               href="#"
-              className="bg-white/20 hover:bg-white/30 rounded-lg p-4 text-center transition-colors"
+              className="bg-white/10 hover:bg-white/20 rounded-lg p-6 text-center transition-colors group"
             >
-              <div className="text-2xl mb-2">💼</div>
+              <div className="w-12 h-12 bg-cyan-500 rounded-lg flex items-center justify-center mx-auto mb-4 group-hover:bg-cyan-400 transition-colors">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </div>
               <div className="font-medium">員工專區</div>
             </a>
             <a
               href="#"
-              className="bg-white/20 hover:bg-white/30 rounded-lg p-4 text-center transition-colors"
+              className="bg-white/10 hover:bg-white/20 rounded-lg p-6 text-center transition-colors group"
             >
-              <div className="text-2xl mb-2">📊</div>
+              <div className="w-12 h-12 bg-cyan-500 rounded-lg flex items-center justify-center mx-auto mb-4 group-hover:bg-cyan-400 transition-colors">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                </svg>
+              </div>
               <div className="font-medium">薪資查詢</div>
             </a>
           </div>

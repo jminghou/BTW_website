@@ -73,57 +73,51 @@ export default function QuickActions() {
     {
       id: 'test-db',
       name: '測試資料庫連線',
-      icon: '🔍',
       description: '檢查資料庫連線狀態',
-      color: 'bg-blue-500 hover:bg-blue-600',
+      color: 'bg-cyan-500 hover:bg-cyan-600',
       category: 'database'
     },
     {
       id: 'init-db',
       name: '初始化資料庫',
-      icon: '⚡',
       description: '建立或更新資料庫表格',
-      color: 'bg-green-500 hover:bg-green-600',
+      color: 'bg-gray-600 hover:bg-gray-700',
       category: 'database'
     },
     {
       id: 'backup',
       name: '備份資料庫',
-      icon: '💾',
       description: '建立資料庫備份檔案',
-      color: 'bg-purple-500 hover:bg-purple-600',
+      color: 'bg-gray-500 hover:bg-gray-600',
       category: 'database'
     },
     {
       id: 'clear-cache',
       name: '清除系統快取',
-      icon: '🧹',
       description: '清除應用程式快取資料',
-      color: 'bg-orange-500 hover:bg-orange-600',
+      color: 'bg-gray-700 hover:bg-gray-800',
       category: 'system'
     },
     {
       id: 'generate-report',
       name: '產生月報表',
-      icon: '📊',
       description: '產生營運數據月報表',
-      color: 'bg-indigo-500 hover:bg-indigo-600',
+      color: 'bg-cyan-600 hover:bg-cyan-700',
       category: 'reports'
     },
     {
       id: 'system-health',
       name: '系統健康檢查',
-      icon: '🏥',
       description: '檢查系統各項服務狀態',
-      color: 'bg-pink-500 hover:bg-pink-600',
+      color: 'bg-gray-800 hover:bg-gray-900',
       category: 'system'
     }
   ];
 
-  const categories: { [key: string]: { name: string; icon: string } } = {
-    database: { name: '資料庫管理', icon: '🗄️' },
-    system: { name: '系統維護', icon: '⚙️' },
-    reports: { name: '報表工具', icon: '📈' }
+  const categories: { [key: string]: { name: string } } = {
+    database: { name: '資料庫管理' },
+    system: { name: '系統維護' },
+    reports: { name: '報表工具' }
   };
 
   const groupedActions = actions.reduce((acc, action) => {
@@ -135,12 +129,12 @@ export default function QuickActions() {
   }, {} as { [key: string]: typeof actions });
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-red-50 py-16">
+    <div className="min-h-screen bg-gray-50 py-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold text-gray-900 mb-4">
-            ⚡ 快速操作中心
+            快速操作中心
           </h2>
           <p className="text-lg text-gray-600">
             常用的系統管理和維護工具，一鍵執行各種管理任務
@@ -152,19 +146,15 @@ export default function QuickActions() {
           const category = categories[categoryKey];
           return (
             <div key={categoryKey} className="mb-12">
-              <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-                <span className="mr-3">{category.icon}</span>
+              <h3 className="text-2xl font-bold text-gray-900 mb-6">
                 {category.name}
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {categoryActions.map((action) => (
-                  <div key={action.id} className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
-                    <div className="flex items-center mb-4">
-                      <span className="text-3xl mr-3">{action.icon}</span>
-                      <div>
-                        <h4 className="text-lg font-semibold text-gray-900">{action.name}</h4>
-                        <p className="text-sm text-gray-600">{action.description}</p>
-                      </div>
+                  <div key={action.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+                    <div className="mb-6">
+                      <h4 className="text-lg font-semibold text-gray-900 mb-2">{action.name}</h4>
+                      <p className="text-sm text-gray-600 leading-relaxed">{action.description}</p>
                     </div>
                     <button
                       onClick={() => handleAction(action.id, action.name)}
@@ -189,14 +179,14 @@ export default function QuickActions() {
 
         {/* Action Result */}
         {actionResult && (
-          <div className={`mt-8 p-6 rounded-lg ${actionResult.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+          <div className={`mt-8 p-6 rounded-lg border ${actionResult.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
             <h3 className={`text-lg font-semibold mb-3 ${actionResult.success ? 'text-green-800' : 'text-red-800'}`}>
-              {actionResult.success ? '✅' : '❌'} {actionResult.actionName} - 操作結果
+              {actionResult.actionName} - 操作結果
             </h3>
             
             {actionResult.success ? (
-              <div className="space-y-2">
-                <p className={`${actionResult.success ? 'text-green-700' : 'text-red-700'}`}>
+              <div className="space-y-3">
+                <p className="text-green-700">
                   {actionResult.message}
                 </p>
                 
@@ -213,13 +203,13 @@ export default function QuickActions() {
                 )}
                 
                 {actionResult.details && (
-                  <div className="mt-4 bg-green-100 rounded-lg p-4">
-                    <h4 className="font-medium text-green-800 mb-2">詳細資訊：</h4>
-                    <div className="grid grid-cols-2 gap-2 text-sm text-green-700">
+                  <div className="mt-4 bg-white rounded-lg p-4 border border-green-200">
+                    <h4 className="font-medium text-green-800 mb-3">詳細資訊</h4>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
                       {Object.entries(actionResult.details).map(([key, value]) => (
                         <div key={key} className="flex justify-between">
-                          <span className="capitalize">{key}:</span>
-                          <span className="font-medium">{value as string}</span>
+                          <span className="text-gray-600 capitalize">{key}:</span>
+                          <span className="font-medium text-gray-900">{value as string}</span>
                         </div>
                       ))}
                     </div>
@@ -227,7 +217,7 @@ export default function QuickActions() {
                 )}
               </div>
             ) : (
-              <p className={`${actionResult.success ? 'text-green-700' : 'text-red-700'}`}>
+              <p className="text-red-700">
                 錯誤：{actionResult.error}
               </p>
             )}
@@ -235,17 +225,31 @@ export default function QuickActions() {
         )}
 
         {/* Tips */}
-        <div className="mt-12 bg-yellow-50 border border-yellow-200 rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-yellow-800 mb-3 flex items-center">
-            <span className="mr-2">💡</span>
+        <div className="mt-12 bg-white border border-gray-200 rounded-lg p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200">
             使用提示
           </h3>
-          <div className="text-yellow-700 space-y-2 text-sm">
-            <p>• 資料庫操作前建議先執行「測試資料庫連線」確認狀態</p>
-            <p>• 「初始化資料庫」會建立必要的表格，首次使用時請先執行</p>
-            <p>• 建議定期執行「備份資料庫」和「系統健康檢查」</p>
-            <p>• 如遇到系統緩慢問題，可嘗試「清除系統快取」</p>
-            <p>• 月報表會包含完整的營運數據分析</p>
+          <div className="text-gray-600 space-y-3 text-sm">
+            <div className="flex items-start">
+              <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full mt-2 mr-3 flex-shrink-0"></div>
+              <p>資料庫操作前建議先執行「測試資料庫連線」確認狀態</p>
+            </div>
+            <div className="flex items-start">
+              <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full mt-2 mr-3 flex-shrink-0"></div>
+              <p>「初始化資料庫」會建立必要的表格，首次使用時請先執行</p>
+            </div>
+            <div className="flex items-start">
+              <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full mt-2 mr-3 flex-shrink-0"></div>
+              <p>建議定期執行「備份資料庫」和「系統健康檢查」</p>
+            </div>
+            <div className="flex items-start">
+              <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full mt-2 mr-3 flex-shrink-0"></div>
+              <p>如遇到系統緩慢問題，可嘗試「清除系統快取」</p>
+            </div>
+            <div className="flex items-start">
+              <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full mt-2 mr-3 flex-shrink-0"></div>
+              <p>月報表會包含完整的營運數據分析</p>
+            </div>
           </div>
         </div>
       </div>

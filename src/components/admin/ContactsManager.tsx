@@ -123,17 +123,17 @@ export default function ContactsManager() {
     <div className="min-h-screen bg-gray-50 py-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="text-center mb-8">
+        <div className="text-center mt-14 mb-8">
           <h2 className="text-3xl font-bold text-gray-900 mb-4">
-            📋 聯絡表單管理
+            官網聯絡表單列表
           </h2>
           <p className="text-lg text-gray-600">
-            管理和查看所有客戶聯絡表單資料
+            請定期檢查有沒有人在官網上聯絡我們，看到請及時回覆
           </p>
         </div>
 
         {/* Controls */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
           <div className="flex flex-col lg:flex-row gap-4 mb-4">
             {/* Search */}
             <div className="flex-1">
@@ -146,7 +146,7 @@ export default function ContactsManager() {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="搜尋姓名、信箱、主旨或訊息..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
               />
             </div>
 
@@ -159,7 +159,7 @@ export default function ContactsManager() {
                 id="filter"
                 value={filterIdentity}
                 onChange={(e) => setFilterIdentity(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
               >
                 <option value="all">全部身份</option>
                 {uniqueIdentities.map(identity => (
@@ -171,23 +171,23 @@ export default function ContactsManager() {
 
           {/* Actions */}
           <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
-            <div className="text-sm text-gray-600">
+            <div className="text-sm text-gray-500">
               顯示 {filteredContacts.length} 筆資料（共 {contacts.length} 筆）
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-3">
               <button
                 onClick={loadContacts}
                 disabled={isLoading}
-                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors disabled:opacity-50"
+                className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
               >
-                {isLoading ? '載入中...' : '🔄 重新載入'}
+                {isLoading ? '載入中...' : '重新載入'}
               </button>
               {filteredContacts.length > 0 && (
                 <button
                   onClick={exportToCSV}
-                  className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                  className="bg-cyan-500 hover:bg-cyan-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
                 >
-                  📥 匯出 CSV
+                  匯出 CSV
                 </button>
               )}
             </div>
@@ -195,12 +195,19 @@ export default function ContactsManager() {
         </div>
 
         {/* Contacts Table */}
-        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           {filteredContacts.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              <div className="text-6xl mb-4">📭</div>
-              <p className="text-lg">
-                {searchTerm || filterIdentity !== 'all' ? '沒有符合搜尋條件的資料' : '目前沒有聯絡表單資料'}
+            <div className="text-center py-16 text-gray-500">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 7.89a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <p className="text-lg font-medium text-gray-900 mb-2">
+                {searchTerm || filterIdentity !== 'all' ? '沒有符合條件的資料' : '尚無聯絡表單'}
+              </p>
+              <p className="text-gray-500">
+                {searchTerm || filterIdentity !== 'all' ? '請調整搜尋條件' : '目前沒有收到任何聯絡表單資料'}
               </p>
             </div>
           ) : (
@@ -277,13 +284,13 @@ export default function ContactsManager() {
                               <button
                                 onClick={() => handleDeleteContact(contact.id)}
                                 disabled={deleteLoading === contact.id}
-                                className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs transition-colors disabled:opacity-50"
+                                className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
                               >
-                                {deleteLoading === contact.id ? '刪除中...' : '確認'}
+                                {deleteLoading === contact.id ? '刪除中...' : '確認刪除'}
                               </button>
                               <button
                                 onClick={() => setDeleteConfirm(null)}
-                                className="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded text-xs transition-colors"
+                                className="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded-lg text-xs font-medium transition-colors"
                               >
                                 取消
                               </button>
@@ -291,9 +298,9 @@ export default function ContactsManager() {
                           ) : (
                             <button
                               onClick={() => setDeleteConfirm(contact.id)}
-                              className="text-red-600 hover:text-red-900 hover:bg-red-50 px-3 py-1 rounded text-xs transition-colors"
+                              className="text-red-600 hover:text-red-800 hover:bg-red-50 px-3 py-1 rounded-lg text-xs font-medium transition-colors"
                             >
-                              🗑️ 刪除
+                              刪除
                             </button>
                           )}
                         </td>

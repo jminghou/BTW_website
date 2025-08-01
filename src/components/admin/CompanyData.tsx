@@ -2,10 +2,10 @@
 
 export default function CompanyData() {
   const companyStats = [
-    { label: "總營業額", value: "NT$ 15,280,000", icon: "💰", trend: "+12.5%" },
-    { label: "活躍合作餐廳", value: "127", icon: "🏪", trend: "+8%" },
-    { label: "月活躍用戶", value: "34,562", icon: "👥", trend: "+15.2%" },
-    { label: "平均滿意度", value: "4.8/5.0", icon: "⭐", trend: "+0.3" }
+    { label: "總營業額", value: "NT$ 15,280,000", trend: "+12.5%", color: "bg-cyan-500" },
+    { label: "活躍合作餐廳", value: "127", trend: "+8%", color: "bg-gray-500" },
+    { label: "月活躍用戶", value: "34,562", trend: "+15.2%", color: "bg-gray-600" },
+    { label: "平均滿意度", value: "4.8/5.0", trend: "+0.3", color: "bg-gray-700" }
   ];
 
   const partners = [
@@ -44,12 +44,12 @@ export default function CompanyData() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 py-16">
+    <div className="min-h-screen bg-gray-50 py-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold text-gray-900 mb-4">
-            🏢 公司營運資料
+            公司營運資料
           </h2>
           <p className="text-lg text-gray-600">
             BTW 公司營運數據、合作夥伴及市場分析
@@ -58,22 +58,21 @@ export default function CompanyData() {
 
         {/* Company Stats */}
         <div className="mb-12">
-          <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-            <span className="mr-3">📊</span>
+          <h3 className="text-2xl font-bold text-gray-900 mb-6">
             營運績效
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {companyStats.map((stat, index) => (
-              <div key={index} className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+              <div key={index} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">{stat.label}</p>
-                    <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-500 mb-1">{stat.label}</p>
+                    <p className="text-2xl font-bold text-gray-900 mb-1">{stat.value}</p>
                     <p className="text-sm text-green-600 font-medium">
                       {stat.trend} 較上月
                     </p>
                   </div>
-                  <div className="text-4xl">{stat.icon}</div>
+                  <div className={`w-3 h-3 rounded-full ${stat.color}`}></div>
                 </div>
               </div>
             ))}
@@ -82,11 +81,10 @@ export default function CompanyData() {
 
         {/* Partners */}
         <div className="mb-12">
-          <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-            <span className="mr-3">🤝</span>
+          <h3 className="text-2xl font-bold text-gray-900 mb-6">
             合作夥伴
           </h3>
-          <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
@@ -107,19 +105,19 @@ export default function CompanyData() {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {partners.map((partner, index) => (
-                    <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                    <tr key={index} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900">{partner.name}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{partner.category}</div>
+                        <div className="text-sm text-gray-600">{partner.category}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(partner.status)}`}>
+                        <span className={`inline-flex px-3 py-1 text-xs font-medium rounded-full ${getStatusColor(partner.status)}`}>
                           {getStatusText(partner.status)}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
                         {partner.monthlyOrders.toLocaleString()}
                       </td>
                     </tr>
@@ -132,26 +130,25 @@ export default function CompanyData() {
 
         {/* Regional Data */}
         <div className="mb-12">
-          <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-            <span className="mr-3">🗺️</span>
+          <h3 className="text-2xl font-bold text-gray-900 mb-6">
             區域分佈
           </h3>
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
             {regions.map((region, index) => (
-              <div key={index} className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
-                <h4 className="text-lg font-semibold text-gray-900 mb-4">{region.name}</h4>
-                <div className="space-y-3">
-                  <div className="flex justify-between">
+              <div key={index} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+                <h4 className="text-lg font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200">{region.name}</h4>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
                     <span className="text-gray-600">合作餐廳</span>
-                    <span className="font-medium">{region.restaurants} 家</span>
+                    <span className="font-semibold text-gray-900">{region.restaurants} 家</span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between items-center">
                     <span className="text-gray-600">月訂單數</span>
-                    <span className="font-medium">{region.orders.toLocaleString()}</span>
+                    <span className="font-semibold text-gray-900">{region.orders.toLocaleString()}</span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between items-center">
                     <span className="text-gray-600">月營收</span>
-                    <span className="font-medium text-green-600">{region.revenue}</span>
+                    <span className="font-semibold text-cyan-600">{region.revenue}</span>
                   </div>
                 </div>
               </div>
@@ -160,65 +157,63 @@ export default function CompanyData() {
         </div>
 
         {/* Company Info */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Mission */}
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h3 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-              <span className="mr-2">🎯</span>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200">
               公司使命
             </h3>
-            <p className="text-gray-600 leading-relaxed">
+            <p className="text-gray-600 leading-relaxed mb-6">
               BTW 致力於成為台灣領先的餐飲科技平台，透過創新的技術解決方案，
               連接餐廳與消費者，提供便利、高效的用餐體驗，推動餐飲產業的數位轉型。
             </p>
-            <div className="mt-4 space-y-2">
-              <div className="flex items-center text-sm text-gray-600">
-                <span className="mr-2">🚀</span>
-                創新驅動：持續推出前瞻性技術解決方案
+            <div className="space-y-3">
+              <div className="flex items-start text-sm text-gray-600">
+                <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full mt-2 mr-3 flex-shrink-0"></div>
+                <span>創新驅動：持續推出前瞻性技術解決方案</span>
               </div>
-              <div className="flex items-center text-sm text-gray-600">
-                <span className="mr-2">🤝</span>
-                合作共贏：與合作夥伴建立長期互信關係
+              <div className="flex items-start text-sm text-gray-600">
+                <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full mt-2 mr-3 flex-shrink-0"></div>
+                <span>合作共贏：與合作夥伴建立長期互信關係</span>
               </div>
-              <div className="flex items-center text-sm text-gray-600">
-                <span className="mr-2">💎</span>
-                卓越品質：提供優質可靠的服務體驗
+              <div className="flex items-start text-sm text-gray-600">
+                <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full mt-2 mr-3 flex-shrink-0"></div>
+                <span>卓越品質：提供優質可靠的服務體驗</span>
               </div>
             </div>
           </div>
 
           {/* Goals */}
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h3 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-              <span className="mr-2">📈</span>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200">
               年度目標
             </h3>
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div>
-                <div className="flex justify-between mb-1">
-                  <span className="text-sm text-gray-600">合作餐廳數量</span>
-                  <span className="text-sm font-medium">127/150</span>
+                <div className="flex justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-600">合作餐廳數量</span>
+                  <span className="text-sm font-semibold">127/150</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div className="bg-blue-600 h-2 rounded-full" style={{ width: '85%' }}></div>
+                  <div className="bg-cyan-500 h-2 rounded-full transition-all duration-300" style={{ width: '85%' }}></div>
                 </div>
               </div>
               <div>
-                <div className="flex justify-between mb-1">
-                  <span className="text-sm text-gray-600">月活躍用戶</span>
-                  <span className="text-sm font-medium">34,562/50,000</span>
+                <div className="flex justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-600">月活躍用戶</span>
+                  <span className="text-sm font-semibold">34,562/50,000</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div className="bg-green-600 h-2 rounded-full" style={{ width: '69%' }}></div>
+                  <div className="bg-gray-500 h-2 rounded-full transition-all duration-300" style={{ width: '69%' }}></div>
                 </div>
               </div>
               <div>
-                <div className="flex justify-between mb-1">
-                  <span className="text-sm text-gray-600">年營收目標</span>
-                  <span className="text-sm font-medium">63%</span>
+                <div className="flex justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-600">年營收目標</span>
+                  <span className="text-sm font-semibold">63%</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div className="bg-purple-600 h-2 rounded-full" style={{ width: '63%' }}></div>
+                  <div className="bg-gray-600 h-2 rounded-full transition-all duration-300" style={{ width: '63%' }}></div>
                 </div>
               </div>
             </div>

@@ -60,44 +60,36 @@ export default function Dashboard() {
     }
   };
 
-  const StatCard = ({ title, value, icon, bgColor, textColor }: {
+  const StatCard = ({ title, value, bgColor }: {
     title: string;
     value: number;
-    icon: string;
     bgColor: string;
-    textColor: string;
   }) => (
-    <div className={`${bgColor} rounded-lg p-6 shadow-lg`}>
-      <div className="flex items-center">
-        <div className="flex-shrink-0">
-          <span className="text-3xl">{icon}</span>
+    <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+      <div className="flex items-center justify-between">
+        <div className="flex-1">
+          <p className="text-sm font-medium text-gray-500 mb-1">
+            {title}
+          </p>
+          <p className="text-3xl font-bold text-gray-900">
+            {isLoading ? '...' : value.toLocaleString()}
+          </p>
         </div>
-        <div className="ml-5 w-0 flex-1">
-          <dl>
-            <dt className={`text-sm font-medium ${textColor} truncate`}>
-              {title}
-            </dt>
-            <dd className="flex items-baseline">
-              <div className={`text-2xl font-semibold ${textColor}`}>
-                {isLoading ? '...' : value}
-              </div>
-            </dd>
-          </dl>
-        </div>
+        <div className={`w-3 h-3 rounded-full ${bgColor}`}></div>
       </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 pt-20 pb-12">
+    <div className="min-h-screen bg-gray-50 pt-20 pb-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            📊 內部員工儀表板
+            儀表板
           </h1>
-          <p className="text-xl text-gray-600">
-            歡迎來到 BTW 內部管理系統，查看重要數據和營運狀況
+          <p className="text-lg text-gray-600">
+            BTW 內部管理系統 - 重要數據和營運狀況總覽
           </p>
           <div className="mt-4 text-sm text-gray-500">
             最後更新時間：{new Date().toLocaleString('zh-TW')}
@@ -109,95 +101,97 @@ export default function Dashboard() {
           <StatCard
             title="總聯絡數"
             value={stats.totalContacts}
-            icon="📈"
-            bgColor="bg-blue-100"
-            textColor="text-blue-800"
+            bgColor="bg-cyan-500"
           />
           <StatCard
             title="今日新增"
             value={stats.todayContacts}
-            icon="📅"
-            bgColor="bg-green-100"
-            textColor="text-green-800"
+            bgColor="bg-gray-400"
           />
           <StatCard
             title="本週累計"
             value={stats.weeklyContacts}
-            icon="📊"
-            bgColor="bg-purple-100"
-            textColor="text-purple-800"
+            bgColor="bg-gray-500"
           />
           <StatCard
             title="本月累計"
             value={stats.monthlyContacts}
-            icon="📆"
-            bgColor="bg-orange-100"
-            textColor="text-orange-800"
+            bgColor="bg-gray-600"
           />
         </div>
 
         {/* Quick Info Cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12">
           {/* System Status */}
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-              <span className="mr-2">🔧</span>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 border-b border-gray-200 pb-2">
               系統狀態
             </h3>
-            <div className="space-y-3">
+            <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <span className="text-gray-600">資料庫連線</span>
-                <span className="text-green-600 font-medium">正常</span>
+                <div className="flex items-center">
+                  <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                  <span className="text-gray-900 font-medium">正常</span>
+                </div>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-gray-600">網站狀態</span>
-                <span className="text-green-600 font-medium">運行中</span>
+                <div className="flex items-center">
+                  <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                  <span className="text-gray-900 font-medium">運行中</span>
+                </div>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-gray-600">最後備份</span>
-                <span className="text-gray-600 font-medium">2小時前</span>
+                <span className="text-gray-900 font-medium">2小時前</span>
               </div>
             </div>
           </div>
 
           {/* Recent Activity */}
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-              <span className="mr-2">🕒</span>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 border-b border-gray-200 pb-2">
               最近活動
             </h3>
             <div className="space-y-3">
-              <div className="text-sm text-gray-600">
-                • 新聯絡表單提交 - 5分鐘前
+              <div className="flex items-center text-sm text-gray-600">
+                <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full mr-3 flex-shrink-0"></div>
+                新聯絡表單提交 - 5分鐘前
               </div>
-              <div className="text-sm text-gray-600">
-                • 資料庫備份完成 - 2小時前
+              <div className="flex items-center text-sm text-gray-600">
+                <div className="w-1.5 h-1.5 bg-gray-400 rounded-full mr-3 flex-shrink-0"></div>
+                資料庫備份完成 - 2小時前
               </div>
-              <div className="text-sm text-gray-600">
-                • 系統更新部署 - 1天前
+              <div className="flex items-center text-sm text-gray-600">
+                <div className="w-1.5 h-1.5 bg-gray-400 rounded-full mr-3 flex-shrink-0"></div>
+                系統更新部署 - 1天前
               </div>
-              <div className="text-sm text-gray-600">
-                • 安全性掃描完成 - 2天前
+              <div className="flex items-center text-sm text-gray-600">
+                <div className="w-1.5 h-1.5 bg-gray-400 rounded-full mr-3 flex-shrink-0"></div>
+                安全性掃描完成 - 2天前
               </div>
             </div>
           </div>
         </div>
 
         {/* Welcome Message */}
-        <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg p-8 text-white text-center">
-          <h2 className="text-2xl font-bold mb-4">歡迎使用 BTW 內部管理系統</h2>
-          <p className="text-lg opacity-90 mb-6">
-            這裡是專為 BTW 內部員工設計的管理平台，您可以查看聯絡表單、管理客戶資料、了解公司最新資訊。
-          </p>
-          <div className="flex flex-wrap justify-center gap-4">
-            <div className="bg-white/20 rounded-lg px-4 py-2">
-              <span className="text-sm font-medium">安全連線</span>
-            </div>
-            <div className="bg-white/20 rounded-lg px-4 py-2">
-              <span className="text-sm font-medium">即時資料</span>
-            </div>
-            <div className="bg-white/20 rounded-lg px-4 py-2">
-              <span className="text-sm font-medium">24/7 支援</span>
+        <div className="bg-gradient-to-r from-cyan-500 to-cyan-600 rounded-lg p-8 text-white">
+          <div className="max-w-3xl mx-auto text-center">
+            <h2 className="text-2xl font-bold mb-4">BTW 內部管理系統</h2>
+            <p className="text-lg mb-6 opacity-90">
+              專為內部員工設計的管理平台，提供聯絡表單管理、客戶資料查詢、公司資訊查看等功能
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-white/10 rounded-lg px-4 py-3 backdrop-blur-sm">
+                <span className="text-sm font-medium">安全認證</span>
+              </div>
+              <div className="bg-white/10 rounded-lg px-4 py-3 backdrop-blur-sm">
+                <span className="text-sm font-medium">即時同步</span>
+              </div>
+              <div className="bg-white/10 rounded-lg px-4 py-3 backdrop-blur-sm">
+                <span className="text-sm font-medium">全天候服務</span>
+              </div>
             </div>
           </div>
         </div>

@@ -156,9 +156,9 @@ export default function AdminPage() {
     <main className="min-h-screen">
       <InternalNavbar onLogout={handleLogout} />
       
-      <section id="dashboard" className="min-h-screen">
+      {/* <section id="dashboard" className="min-h-screen">
         <Dashboard />
-      </section>
+      </section> */}
       
       <section id="contacts" className="min-h-screen">
         <ContactsManager />

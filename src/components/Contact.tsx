@@ -27,6 +27,42 @@ const Contact = () => {
     setFormData(prev => ({ ...prev, identity: e.target.value }));
   };
 
+  // 根據身份代表返回對應的 placeholder 文字
+  const getTitlePlaceholder = () => {
+    switch (formData.identity) {
+      case '企業承辦':
+        return '請告知您的公司名稱 *';
+      case '餐飲商家':
+        return '請告知您的店家名稱 *';
+      default:
+        return '請告知您的單位名稱 *';
+    }
+  };
+
+  // 根據身份代表返回對應的訊息區域 placeholder 文字
+  const getMessagePlaceholder = () => {
+    switch (formData.identity) {
+      case '企業承辦':
+        return '請問何時方便與您聯絡？';
+      case '餐飲商家':
+        return '請告知您的所在地區，以及何時方便與您聯絡？';
+      default:
+        return '請留下您想訊問的訊息';
+    }
+  };
+
+  // 根據身份代表返回對應的 placeholder 顏色
+  const getPlaceholderColor = () => {
+    switch (formData.identity) {
+      case '餐飲商家':
+        return 'placeholder-[#e03838]';
+      case '其他':
+        return 'placeholder-gray-400';
+      default:
+        return 'placeholder-[#00bed6]';
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -113,13 +149,13 @@ const Contact = () => {
                 <input 
                   type="radio" 
                   name="identity" 
-                  value="企業餐飲承辦" 
+                  value="企業承辦" 
                   className="mr-2" 
                   required 
-                  checked={formData.identity === '企業餐飲承辦'}
+                  checked={formData.identity === '企業承辦'}
                   onChange={handleRadioChange}
                 />
-                企業餐飲承辦
+                企業承辦
               </label>
               <label className="flex items-center">
                 <input 
@@ -151,7 +187,7 @@ const Contact = () => {
               name="user_name"
               value={formData.user_name}
               onChange={handleChange}
-              className="w-full p-2 border rounded" 
+              className={`w-full p-2 border rounded ${getPlaceholderColor()}`} 
               placeholder="可以怎麼稱呼您 *" 
               required 
             />
@@ -162,8 +198,9 @@ const Contact = () => {
               name="title"
               value={formData.title}
               onChange={handleChange}
-              className="w-full p-2 border rounded" 
-              placeholder="您的單位/職稱" 
+              className={`w-full p-2 border rounded ${getPlaceholderColor()}`} 
+              placeholder={getTitlePlaceholder()} 
+              required
             />
           </div>
           <div>
@@ -172,7 +209,7 @@ const Contact = () => {
               name="user_email"
               value={formData.user_email}
               onChange={handleChange}
-              className="w-full p-2 border rounded" 
+              className={`w-full p-2 border rounded ${getPlaceholderColor()}`} 
               placeholder="電子郵件 *" 
               required 
             />
@@ -183,7 +220,7 @@ const Contact = () => {
               name="phone"
               value={formData.phone}
               onChange={handleChange}
-              className="w-full p-2 border rounded" 
+              className={`w-full p-2 border rounded ${getPlaceholderColor()}`} 
               placeholder="電話 *" 
               required 
             />
@@ -193,9 +230,9 @@ const Contact = () => {
               name="message"
               value={formData.message}
               onChange={handleChange}
-              className="w-full p-2 border rounded" 
+              className={`w-full p-2 border rounded ${getPlaceholderColor()}`} 
               rows={4} 
-              placeholder="請留下您的訊息"
+              placeholder={getMessagePlaceholder()}
             ></textarea>
           </div>
           <div className="text-sm text-gray-600 mb-4">
