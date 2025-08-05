@@ -115,9 +115,9 @@ export default function QuickActions() {
   ];
 
   const categories: { [key: string]: { name: string } } = {
-    database: { name: '資料庫管理' },
-    system: { name: '系統維護' },
-    reports: { name: '報表工具' }
+    database: { name: '品牌資產文件' },
+    system: { name: '系統操作說明' },
+    reports: { name: '公司簡報' }
   };
 
   const groupedActions = actions.reduce((acc, action) => {
@@ -134,7 +134,7 @@ export default function QuickActions() {
         {/* Header */}
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold text-gray-900 mb-4">
-            快速操作中心
+            重要文件下載
           </h2>
           <p className="text-lg text-gray-600">
             常用的系統管理和維護工具，一鍵執行各種管理任務
@@ -167,7 +167,7 @@ export default function QuickActions() {
                           執行中...
                         </div>
                       ) : (
-                        '執行操作'
+                        '執行'
                       )}
                     </button>
                   </div>
@@ -224,34 +224,7 @@ export default function QuickActions() {
           </div>
         )}
 
-        {/* Tips */}
-        <div className="mt-12 bg-white border border-gray-200 rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200">
-            使用提示
-          </h3>
-          <div className="text-gray-600 space-y-3 text-sm">
-            <div className="flex items-start">
-              <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full mt-2 mr-3 flex-shrink-0"></div>
-              <p>資料庫操作前建議先執行「測試資料庫連線」確認狀態</p>
-            </div>
-            <div className="flex items-start">
-              <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full mt-2 mr-3 flex-shrink-0"></div>
-              <p>「初始化資料庫」會建立必要的表格，首次使用時請先執行</p>
-            </div>
-            <div className="flex items-start">
-              <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full mt-2 mr-3 flex-shrink-0"></div>
-              <p>建議定期執行「備份資料庫」和「系統健康檢查」</p>
-            </div>
-            <div className="flex items-start">
-              <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full mt-2 mr-3 flex-shrink-0"></div>
-              <p>如遇到系統緩慢問題，可嘗試「清除系統快取」</p>
-            </div>
-            <div className="flex items-start">
-              <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full mt-2 mr-3 flex-shrink-0"></div>
-              <p>月報表會包含完整的營運數據分析</p>
-            </div>
-          </div>
-        </div>
+        
       </div>
     </div>
   );

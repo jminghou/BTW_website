@@ -6,7 +6,7 @@ import Dashboard from '@/components/admin/Dashboard';
 import ContactsManager from '@/components/admin/ContactsManager';
 import EmployeeInfo from '@/components/admin/EmployeeInfo';
 import CompanyData from '@/components/admin/CompanyData';
-import QuickActions from '@/components/admin/QuickActions';
+import BtwDownload from '@/components/admin/BtwDownload';
 
 interface Contact {
   id: number;
@@ -42,7 +42,7 @@ export default function AdminPage() {
     // 這裡設定簡單的硬編碼驗證，您可以後續改為從資料庫驗證
     const validCredentials = {
       username: 'admin',
-      password: 'btw2024admin'
+      password: '5241'
     };
 
     // 模擬API請求延遲
@@ -160,20 +160,22 @@ export default function AdminPage() {
         <Dashboard />
       </section> */}
       
-      <section id="contacts" className="min-h-screen">
-        <ContactsManager />
-      </section>
+      
       
       <section id="employee-info" className="min-h-screen">
         <EmployeeInfo />
+      </section>
+
+      <section id="contacts" className="min-h-screen">
+        <ContactsManager />
       </section>
       
       <section id="company-data" className="min-h-screen">
         <CompanyData />
       </section>
       
-      <section id="quick-actions" className="min-h-screen">
-        <QuickActions />
+      <section id="download" className="min-h-screen">
+        <BtwDownload />
       </section>
       
       <footer className="bg-gray-800 text-white py-8">

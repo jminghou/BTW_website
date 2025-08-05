@@ -2,27 +2,30 @@
 
 export default function CompanyData() {
   const companyStats = [
-    { label: "總營業額", value: "NT$ 15,280,000", trend: "+12.5%", color: "bg-cyan-500" },
-    { label: "活躍合作餐廳", value: "127", trend: "+8%", color: "bg-gray-500" },
-    { label: "月活躍用戶", value: "34,562", trend: "+15.2%", color: "bg-gray-600" },
-    { label: "平均滿意度", value: "4.8/5.0", trend: "+0.3", color: "bg-gray-700" }
+    { label: "2025年營業額", value: "NT$ 35,200,000", trend: "+12.5%", color: "bg-cyan-500" },
+    { label: "2025年訂單數量", value: "2,580,200", trend: "+8%", color: "bg-gray-500" },
+    { label: "月活躍用戶", value: "3,856", trend: "+15.2%", color: "bg-gray-600" },
+    { label: "活躍合作餐廳數", value: "182", trend: "+0.3", color: "bg-gray-700" }
   ];
 
   const partners = [
-    { name: "台北101餐廳", category: "高級餐飲", status: "active", monthlyOrders: 1250 },
-    { name: "鼎泰豐", category: "中式料理", status: "active", monthlyOrders: 2100 },
-    { name: "星巴克", category: "咖啡飲品", status: "active", monthlyOrders: 3800 },
-    { name: "麥當勞", category: "速食", status: "active", monthlyOrders: 4500 },
-    { name: "必勝客", category: "披薩", status: "pending", monthlyOrders: 800 },
-    { name: "肯德基", category: "速食", status: "active", monthlyOrders: 2200 }
+    { name: "世界先進", category: "南崁、新竹", status: "active", monthlyOrders: 6250 },
+    { name: "聯發科", category: "台北、新竹、台南", status: "active", monthlyOrders: 8100 },
+    { name: "鴻佰鴻海", category: "高雄、新北", status: "active", monthlyOrders: 3800 },
+    { name: "華邦新唐", category: "台北、竹北、台南", status: "active", monthlyOrders: 4500 },
+    { name: "奕力", category: "竹北", status: "active", monthlyOrders: 1800 },
+    { name: "立綺", category: "竹北", status: "active", monthlyOrders: 1200 }
   ];
 
   const regions = [
-    { name: "台北市", restaurants: 45, orders: 12500, revenue: "NT$ 6,200,000" },
-    { name: "新北市", restaurants: 32, orders: 8900, revenue: "NT$ 4,100,000" },
-    { name: "桃園市", restaurants: 25, orders: 6800, revenue: "NT$ 2,800,000" },
-    { name: "台中市", restaurants: 18, orders: 5200, revenue: "NT$ 1,900,000" },
-    { name: "高雄市", restaurants: 7, orders: 2100, revenue: "NT$ 280,000" }
+    { name: "台北", restaurants: 45, orders: 12500, revenue: "NT$ 6,200,000" },
+    { name: "新北", restaurants: 32, orders: 8900, revenue: "NT$ 4,100,000" },
+    { name: "桃園", restaurants: 25, orders: 6800, revenue: "NT$ 2,800,000" },
+    { name: "新竹", restaurants: 18, orders: 5200, revenue: "NT$ 1,900,000" },
+    { name: "竹北", restaurants: 18, orders: 5200, revenue: "NT$ 1,900,000" },
+    { name: "台中", restaurants: 18, orders: 5200, revenue: "NT$ 1,900,000" },
+    { name: "台南", restaurants: 18, orders: 5200, revenue: "NT$ 1,900,000" },
+    { name: "高雄", restaurants: 7, orders: 2100, revenue: "NT$ 280,000" }
   ];
 
   const getStatusColor = (status: string) => {
@@ -79,10 +82,74 @@ export default function CompanyData() {
           </div>
         </div>
 
+        {/* Company Info */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Mission */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200">
+              公司使命
+            </h3>
+            <p className="text-gray-600 leading-relaxed mb-6">
+              BTW 致力於成為台灣領先的餐飲科技平台，透過創新的技術解決方案，
+              連接餐廳與消費者，提供便利、高效的用餐體驗，推動餐飲產業的數位轉型。
+            </p>
+            <div className="space-y-3">
+              <div className="flex items-start text-sm text-gray-600">
+                <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full mt-2 mr-3 flex-shrink-0"></div>
+                <span>創新驅動：持續推出前瞻性技術解決方案</span>
+              </div>
+              <div className="flex items-start text-sm text-gray-600">
+                <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full mt-2 mr-3 flex-shrink-0"></div>
+                <span>合作共贏：與合作夥伴建立長期互信關係</span>
+              </div>
+              <div className="flex items-start text-sm text-gray-600">
+                <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full mt-2 mr-3 flex-shrink-0"></div>
+                <span>卓越品質：提供優質可靠的服務體驗</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Goals */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200">
+              年度目標
+            </h3>
+            <div className="space-y-6">
+              <div>
+                <div className="flex justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-600">年營收目標 (泰國門檻)</span>
+                  <span className="text-sm font-semibold">35,200,000/80,000,000</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="bg-cyan-500 h-2 rounded-full transition-all duration-300" style={{ width: '65%' }}></div>
+                </div>
+              </div>
+              <div>
+                <div className="flex justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-600">月活躍用戶</span>
+                  <span className="text-sm font-semibold">34,562/50,000</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="bg-gray-500 h-2 rounded-full transition-all duration-300" style={{ width: '69%' }}></div>
+                </div>
+              </div>
+              <div>
+                <div className="flex justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-600">合作餐廳數</span>
+                  <span className="text-sm font-semibold">63%</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="bg-gray-600 h-2 rounded-full transition-all duration-300" style={{ width: '63%' }}></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Partners */}
         <div className="mb-12">
-          <h3 className="text-2xl font-bold text-gray-900 mb-6">
-            合作夥伴
+          <h3 className="text-2xl font-bold text-gray-900 mb-6 mt-12">
+            企業客戶營運績效
           </h3>
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
             <div className="overflow-x-auto">
@@ -90,10 +157,10 @@ export default function CompanyData() {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      餐廳名稱
+                      企業名稱
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      類別
+                      地區
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       狀態
@@ -131,7 +198,7 @@ export default function CompanyData() {
         {/* Regional Data */}
         <div className="mb-12">
           <h3 className="text-2xl font-bold text-gray-900 mb-6">
-            區域分佈
+            各區域客戶營運狀況
           </h3>
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
             {regions.map((region, index) => (
@@ -156,69 +223,7 @@ export default function CompanyData() {
           </div>
         </div>
 
-        {/* Company Info */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Mission */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200">
-              公司使命
-            </h3>
-            <p className="text-gray-600 leading-relaxed mb-6">
-              BTW 致力於成為台灣領先的餐飲科技平台，透過創新的技術解決方案，
-              連接餐廳與消費者，提供便利、高效的用餐體驗，推動餐飲產業的數位轉型。
-            </p>
-            <div className="space-y-3">
-              <div className="flex items-start text-sm text-gray-600">
-                <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full mt-2 mr-3 flex-shrink-0"></div>
-                <span>創新驅動：持續推出前瞻性技術解決方案</span>
-              </div>
-              <div className="flex items-start text-sm text-gray-600">
-                <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full mt-2 mr-3 flex-shrink-0"></div>
-                <span>合作共贏：與合作夥伴建立長期互信關係</span>
-              </div>
-              <div className="flex items-start text-sm text-gray-600">
-                <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full mt-2 mr-3 flex-shrink-0"></div>
-                <span>卓越品質：提供優質可靠的服務體驗</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Goals */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h3 className="text-xl font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200">
-              年度目標
-            </h3>
-            <div className="space-y-6">
-              <div>
-                <div className="flex justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-600">合作餐廳數量</span>
-                  <span className="text-sm font-semibold">127/150</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div className="bg-cyan-500 h-2 rounded-full transition-all duration-300" style={{ width: '85%' }}></div>
-                </div>
-              </div>
-              <div>
-                <div className="flex justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-600">月活躍用戶</span>
-                  <span className="text-sm font-semibold">34,562/50,000</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div className="bg-gray-500 h-2 rounded-full transition-all duration-300" style={{ width: '69%' }}></div>
-                </div>
-              </div>
-              <div>
-                <div className="flex justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-600">年營收目標</span>
-                  <span className="text-sm font-semibold">63%</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div className="bg-gray-600 h-2 rounded-full transition-all duration-300" style={{ width: '63%' }}></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        
       </div>
     </div>
   );

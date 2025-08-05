@@ -63,10 +63,10 @@ export default function InternalNavbar({ onLogout }: InternalNavbarProps) {
                 公司資料
               </button>
               <button
-                onClick={() => scrollToSection('quick-actions')}
+                onClick={() => scrollToSection('download')}
                 className="text-gray-600 hover:text-cyan-600 px-3 py-2 text-sm font-medium transition-colors duration-200"
               >
-                快速操作
+                文件下載
               </button>
               <button
                 onClick={handleLogout}
@@ -134,10 +134,10 @@ export default function InternalNavbar({ onLogout }: InternalNavbarProps) {
             公司資料
           </button>
           <button
-            onClick={() => scrollToSection('quick-actions')}
+            onClick={() => scrollToSection('download')}
             className="text-gray-600 hover:text-cyan-600 hover:bg-gray-50 block px-3 py-2 rounded-lg text-base font-medium w-full text-left transition-colors duration-200"
           >
-            快速操作
+            文件下載
           </button>
           <button
             onClick={handleLogout}
