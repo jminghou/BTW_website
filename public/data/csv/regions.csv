@@ -1,0 +1,9 @@
+name,restaurants,orders,revenue,designProgress
+台北,3,12500,NT$ 6200000,"EDM:true|內部菜牌:false"
+新北,4,8900,NT$ 4100000,"EDM:true"
+桃園,2,6800,NT$ 2800000,"EDM:true|廣告看版:false|菜牌:false"
+新竹,8,5200,NT$ 1900000,"EDM:true|廣告看版:true|菜牌:true"
+竹北,3,5200,NT$ 1900000,"EDM:true"
+台中,2,5200,NT$ 1900000,"EDM:true"
+台南,3,5200,NT$ 1900000,"EDM:true"
+高雄,8,2100,NT$ 280000,"EDM:false"
