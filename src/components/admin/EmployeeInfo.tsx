@@ -1,46 +1,67 @@
 'use client';
 
+import { useState, useEffect } from 'react';
+import Papa from 'papaparse';
+
+// 定義型別
+interface Announcement {
+  id: number;
+  title: string;
+  date: string;
+  priority: string;
+  content: string;
+}
+
 export default function EmployeeInfo() {
-  const announcements = [
-    {
-      id: 1,
-      title: "酷澎機台入駐",
-      date: "2024-01-15",
-      priority: "high",
-      content: "預計於8月下旬入駐，請各部門準備相關資料。"
-    },
-    {
-      id: 2,
-      title: "奕力機台入駐",
-      date: "2024-01-10",
-      priority: "medium",
-      content: "預計於8月下旬入駐，請各部門準備相關資料。"
-    },
-    {
-      id: 3,
-      title: "辦公室搬遷計畫",
-      date: "2024-01-05",
-      priority: "low",
-      content: "預計於第四季進行辦公室搬遷，新地址資訊將陸續公布。"
-    }
-  ];
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // 載入公告數據
+  useEffect(() => {
+    const loadAnnouncements = async () => {
+      try {
+        const response = await fetch('/data/csv/announcements.csv');
+        const text = await response.text();
+        const data = Papa.parse(text, { header: true });
+        const formattedAnnouncements = data.data.map((announcement: any) => ({
+          ...announcement,
+          id: parseInt(announcement.id)
+        }));
+        setAnnouncements(formattedAnnouncements);
+        setLoading(false);
+      } catch (error) {
+        console.error('載入公告數據時發生錯誤:', error);
+        setLoading(false);
+      }
+    };
+
+    loadAnnouncements();
+  }, []);
 
   const policies = [
     {
       title: "出勤管理",
-      items: ["上班時間：09:00-18:00", "彈性上班時間：08:30-09:30", "午休時間：12:00-13:00"]
+      items: ["上班時間：09:00-18:00", "彈性上班時間：08:30-09:30", "午休時間：1 小時，視實際工作狀況自行調配"]
     },
     {
       title: "請假制度",
-      items: ["年假：依法令規定", "病假：30天/年", "事假：14天/年", "特休假：依年資計算"]
+      items: ["年假(特休)：依勞基法年資級距給假", "病假：30天/年（非因公受傷或生病）", "事假：14天/年"]
     },
     {
-      title: "系統成本修改注意事項",
-      items: ["店家10號「前」通知價格異動則次月生效", "店家10號「後」通知價格異動則次次月生效", "營運請店家提供新菜單並請店家登入系統更新店內價", "新售價及需下架品項需待次月5號會計鎖帳後採購再更新"]
+      title: "系統成本修改時程規定",
+      items: ["店家10號「前」通知價格異動則次月生效", "店家10號「後」通知價格異動則次次月生效", "新售價及需下架品項需待次月5號會計鎖帳後採購再更新"]
     },
     {
-      title: "菜單與餐點圖製作要點",
-      items: ["店家10號「前」通知價格異動則次月生效", "店家10號「後」通知價格異動則次次月生效", "營運請店家提供新菜單並請店家登入系統更新店內價", "新售價及需下架品項需待次月5號會計鎖帳後採購再更新"]
+      title: "系統建檔時程規定",
+      items: ["可以開始排菜單的日期，從採購收到合約的下個月開始", "營運/業務需在排菜當月10號「前」提交品項及價格", "營運/業務需在排菜當月15號「前」提供餐點圖相片或實體餐點"]
+    },
+    {
+      title: "店家餐點圖時程規定",
+      items: ["店家有在官網、外送平台發佈餐點圖者不需提供相片", "在排菜單當月20號「前」仍缺餐點圖時將使用便當寶寶圖做替代", "店家後續補相片後請通知美編更新，並修改管理表狀態"]
+    },
+    {
+      title: "排菜單(EDM、廣告機、菜牌)時程規定",
+      items: ["各據點營運排菜單截止底限為當月25號(三廠除外)", "聯發科內部排菜單截底限為當月20號", "提早完成菜單確認者請提早通知美編製作"]
     }
   ];
 
@@ -80,8 +101,14 @@ export default function EmployeeInfo() {
           <h3 className="text-2xl font-bold text-gray-900 mb-6">
             最新公告
           </h3>
-          <div className="space-y-4">
-            {announcements.map((announcement) => (
+          {loading ? (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500 mx-auto mb-4"></div>
+              <p className="text-gray-600">載入公告中...</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {announcements.map((announcement) => (
               <div key={announcement.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -103,13 +130,14 @@ export default function EmployeeInfo() {
                 </div>
               </div>
             ))}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Policies */}
         <div className="mb-12">
           <h3 className="text-2xl font-bold text-gray-900 mb-6">
-            公司政策
+            公司政策與重要工作時程
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {policies.map((policy, index) => (
