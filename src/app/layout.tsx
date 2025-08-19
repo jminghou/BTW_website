@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import StyledComponentsRegistry from './lib/registry'
+import GoogleAnalytics from '@/components/GoogleAnalytics'
 
 // 設定 Inter 字體
 const inter = Inter({ subsets: ['latin'] })
@@ -55,6 +56,7 @@ export default function RootLayout({
         {/* 其他 head 元素 */}
       </head>
       <body className={`${inter.className} antialiased`}>
+        <GoogleAnalytics />
         <StyledComponentsRegistry>{children}</StyledComponentsRegistry>
       </body>
     </html>
