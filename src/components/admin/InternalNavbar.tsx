@@ -63,6 +63,12 @@ export default function InternalNavbar({ onLogout }: InternalNavbarProps) {
                 公司資料
               </button>
               <button
+                onClick={() => scrollToSection('user-management')}
+                className="text-gray-600 hover:text-cyan-600 px-3 py-2 text-sm font-medium transition-colors duration-200"
+              >
+                用戶管理
+              </button>
+              <button
                 onClick={() => scrollToSection('download')}
                 className="text-gray-600 hover:text-cyan-600 px-3 py-2 text-sm font-medium transition-colors duration-200"
               >
@@ -132,6 +138,12 @@ export default function InternalNavbar({ onLogout }: InternalNavbarProps) {
             className="text-gray-600 hover:text-cyan-600 hover:bg-gray-50 block px-3 py-2 rounded-lg text-base font-medium w-full text-left transition-colors duration-200"
           >
             公司資料
+          </button>
+          <button
+            onClick={() => scrollToSection('user-management')}
+            className="text-gray-600 hover:text-cyan-600 hover:bg-gray-50 block px-3 py-2 rounded-lg text-base font-medium w-full text-left transition-colors duration-200"
+          >
+            用戶管理
           </button>
           <button
             onClick={() => scrollToSection('download')}

@@ -7,6 +7,7 @@ import ContactsManager from '@/components/admin/ContactsManager';
 import EmployeeInfo from '@/components/admin/EmployeeInfo';
 import CompanyData from '@/components/admin/CompanyData';
 import BtwDownload from '@/components/admin/BtwDownload';
+import UserManager from '@/components/admin/UserManager';
 
 interface Contact {
   id: number;
@@ -33,27 +34,39 @@ export default function AdminPage() {
 
   // 清理不再需要的狀態，現在由各組件管理自己的狀態
 
-  // 登入驗證邏輯
+  // 登入驗證邏輯 - 從資料庫驗證
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoggingIn(true);
     setLoginError('');
 
-    // 這裡設定簡單的硬編碼驗證，您可以後續改為從資料庫驗證
-    const validCredentials = {
-      username: 'admin',
-      password: '5241'
-    };
+    try {
+      const response = await fetch('/api/auth', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: loginForm.username,
+          password: loginForm.password
+        })
+      });
 
-    // 模擬API請求延遲
-    await new Promise(resolve => setTimeout(resolve, 1000));
+      const result = await response.json();
 
-    if (loginForm.username === validCredentials.username && 
-        loginForm.password === validCredentials.password) {
-      setIsAuthenticated(true);
-      setLoginError('');
-    } else {
-      setLoginError('帳號或密碼錯誤，請重新輸入');
+      if (result.success) {
+        setIsAuthenticated(true);
+        setLoginError('');
+        // 可以儲存用戶資訊到 localStorage 或狀態管理中
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('userInfo', JSON.stringify(result.data));
+        }
+      } else {
+        setLoginError(result.message || '登入失敗，請重新輸入');
+      }
+    } catch (error) {
+      console.error('登入錯誤：', error);
+      setLoginError('網路錯誤，請稍後再試');
     }
 
     setIsLoggingIn(false);
@@ -62,6 +75,10 @@ export default function AdminPage() {
   const handleLogout = () => {
     setIsAuthenticated(false);
     setLoginForm({ username: '', password: '' });
+    // 清除儲存的用戶資訊
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('userInfo');
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -77,7 +94,7 @@ export default function AdminPage() {
         <div className="max-w-md w-full space-y-8">
           <div className="text-center">
             <div className="mx-auto h-12 w-12 text-4xl mb-4">🔐</div>
-            <h2 className="text-3xl font-bold text-gray-900">管理員登入</h2>
+            <h2 className="text-3xl font-bold text-gray-900">浩華內部員工登入</h2>
             <p className="mt-2 text-sm text-gray-600">請輸入您的帳號密碼以存取管理控制台</p>
           </div>
           
@@ -172,6 +189,10 @@ export default function AdminPage() {
       
       <section id="company-data" className="min-h-screen">
         <CompanyData />
+      </section>
+      
+      <section id="user-management" className="min-h-screen">
+        <UserManager />
       </section>
       
       <section id="download" className="min-h-screen">

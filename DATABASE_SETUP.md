@@ -39,16 +39,40 @@ POSTGRES_DATABASE="your_database"
 - **結果**：顯示連接狀態和當前時間
 
 ### 2. 初始化資料庫表格
-- **用途**：建立必要的資料表（contacts、newsletter_subscriptions）
+- **用途**：建立必要的資料表（users、contacts、newsletter_subscriptions）
 - **按鈕**：綠色「初始化資料庫表格」
-- **注意**：首次使用前必須執行此步驟
+- **注意**：首次使用前必須執行此步驟，會自動建立預設管理員帳號（admin/5241）
 
 ### 3. 查看聯絡表單資料
 - **用途**：顯示所有提交的聯絡表單
 - **按鈕**：紫色「查看聯絡表單資料」
 - **內容**：包含姓名、email、訊息、提交時間等
 
+### 4. 用戶身份管理
+- **用途**：管理系統登入用戶的帳號和權限
+- **功能**：
+  - 新增用戶帳號
+  - 編輯用戶資訊
+  - 更改用戶密碼
+  - 啟用/停用帳號
+  - 刪除用戶
+  - 查看登入紀錄
+
 ## 📊 資料表結構
+
+### users 表格（用戶身份管理）
+| 欄位 | 類型 | 說明 |
+|------|------|------|
+| id | SERIAL | 主鍵，自動遞增 |
+| username | VARCHAR(50) | 用戶名（唯一） |
+| password_hash | VARCHAR(255) | 加密後的密碼 |
+| display_name | VARCHAR(100) | 顯示名稱 |
+| email | VARCHAR(255) | 電子信箱（唯一） |
+| role | VARCHAR(20) | 用戶角色（admin/editor/viewer） |
+| is_active | BOOLEAN | 是否啟用 |
+| last_login | TIMESTAMP | 最後登入時間 |
+| created_at | TIMESTAMP | 建立時間 |
+| updated_at | TIMESTAMP | 更新時間 |
 
 ### contacts 表格
 | 欄位 | 類型 | 說明 |
@@ -91,6 +115,11 @@ POSTGRES_DATABASE="your_database"
 4. **查看資料**
    - 點選「查看聯絡表單資料」
    - 檢視目前所有的聯絡表單提交記錄
+
+5. **管理用戶帳號**
+   - 進入「用戶管理」頁面
+   - 可新增、編輯、刪除用戶帳號
+   - 預設管理員：admin / 5241
 
 ## ⚠️ 注意事項
 
