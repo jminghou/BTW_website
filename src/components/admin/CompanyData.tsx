@@ -79,57 +79,52 @@ export default function CompanyData() {
     const loadCSVData = async () => {
       try {
         // 載入營運績效數據
-        const statsResponse = await fetch('/data/csv/company-stats.csv');
-        const statsText = await statsResponse.text();
-        const statsData = Papa.parse(statsText, { header: true });
-        const formattedStats = statsData.data.map((stat: any) => ({
-          ...stat,
-          value: stat.label.includes('營業額') ? `NT$ ${formatNumber(stat.value)}` :
-                 stat.label.includes('訂單數量') ? formatNumber(stat.value) :
-                 stat.label.includes('用戶') ? formatNumber(stat.value) :
-                 stat.label.includes('餐點') ? formatNumber(stat.value) : stat.value,
-          trend: stat.trend.startsWith('+') || stat.trend.startsWith('-') ? 
-                 stat.trend.charAt(0) + formatNumber(stat.trend.slice(1)) : 
-                 stat.trend
-        }));
-        setCompanyStats(formattedStats);
+        const statsResponse = await fetch('/api/company-stats');
+        const statsResult = await statsResponse.json();
+        if (statsResult.success && statsResult.data) {
+          setCompanyStats(statsResult.data);
+        }
 
         // 載入客戶數據
-        const clientsResponse = await fetch('/data/csv/client.csv');
-        const clientsText = await clientsResponse.text();
-        const clientsData = Papa.parse(clientsText, { header: true });
-        const formattedClients = clientsData.data.map((client: any) => ({
-          ...client,
-          monthlyOrders: parseInt(client.monthlyOrders)
-        }));
-        setPartners(formattedClients);
+        const clientsResponse = await fetch('/api/partners');
+        const clientsResult = await clientsResponse.json();
+        if (clientsResult.success && clientsResult.data) {
+          const formattedClients = clientsResult.data.map((client: any) => ({
+            name: client.name,
+            category: client.category,
+            status: client.status,
+            monthlyOrders: client.monthly_orders
+          }));
+          setPartners(formattedClients);
+        }
 
         // 載入區域數據
-        const regionsResponse = await fetch('/data/csv/regions.csv');
-        const regionsText = await regionsResponse.text();
-        const regionsData = Papa.parse(regionsText, { header: true });
-        const formattedRegions = regionsData.data.map((region: any) => ({
-          ...region,
-          restaurants: parseInt(region.restaurants),
-          orders: parseInt(region.orders),
-          revenue: region.revenue.includes('NT$') ? 
-                   `NT$ ${formatNumber(region.revenue.replace('NT$', '').trim())}` : 
-                   region.revenue,
-          designProgress: parseDesignProgress(region.designProgress)
-        }));
-        setRegions(formattedRegions);
+        const regionsResponse = await fetch('/api/regions');
+        const regionsResult = await regionsResponse.json();
+        if (regionsResult.success && regionsResult.data) {
+          const formattedRegions = regionsResult.data.map((region: any) => ({
+            name: region.name,
+            restaurants: region.restaurants,
+            orders: region.orders,
+            revenue: region.revenue,
+            designProgress: parseDesignProgress(region.design_progress)
+          }));
+          setRegions(formattedRegions);
+        }
 
         // 載入年度目標數據
-        const goalsResponse = await fetch('/data/csv/annual-goals.csv');
-        const goalsText = await goalsResponse.text();
-        const goalsData = Papa.parse(goalsText, { header: true });
-        const formattedGoals = goalsData.data.map((goal: any) => ({
-          ...goal,
-          current: parseInt(goal.current),
-          target: parseInt(goal.target),
-          percentage: parseInt(goal.percentage)
-        }));
-        setAnnualGoals(formattedGoals);
+        const goalsResponse = await fetch('/api/annual-goals');
+        const goalsResult = await goalsResponse.json();
+        if (goalsResult.success && goalsResult.data) {
+          const formattedGoals = goalsResult.data.map((goal: any) => ({
+            label: goal.label,
+            current: goal.current_value,
+            target: goal.target_value,
+            percentage: goal.percentage,
+            color: goal.color
+          }));
+          setAnnualGoals(formattedGoals);
+        }
 
         // 載入日期數據
         const datesResponse = await fetch('/data/csv/dates.csv');
@@ -330,22 +325,22 @@ export default function CompanyData() {
                     <span className="font-semibold text-cyan-600">{region.revenue}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-600">美編製作進度</span>
-                    <div className="flex flex-wrap gap-3">
+                    <span className="text-gray-600">美編進度</span>
+                    <div className="flex flex-wrap justify-end">
                       {region.designProgress.map((item, itemIndex) => (
                         <div key={itemIndex} className="flex items-center">
-                          <div className={`w-4 h-4 rounded border-2 mr-2 flex items-center justify-center ${
+                          <div className={`w-3 h-3 rounded border mr-1 ml-2 flex items-center justify-center ${
                             item.completed 
                               ? 'bg-green-500 border-green-500' 
                               : 'bg-gray-100 border-gray-300'
                           }`}>
                             {item.completed && (
-                              <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                              <svg className="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20">
                                 <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                               </svg>
                             )}
                           </div>
-                          <span className={`text-sm ${item.completed ? 'text-green-700 font-medium' : 'text-gray-500'}`}>
+                          <span className={`text-xs ${item.completed ? 'text-green-700 font-medium' : 'text-gray-500'}`}>
                             {item.name}
                           </span>
                         </div>

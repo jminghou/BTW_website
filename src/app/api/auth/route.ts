@@ -27,14 +27,22 @@ export async function POST(request: NextRequest) {
     } else {
       return NextResponse.json({
         success: false,
-        message: result.error
+        message: result.error,
+        error: result.error // 也提供完整的錯誤物件
       }, { status: 401 });
     }
   } catch (error) {
     console.error('驗證 API 路由錯誤：', error);
+    
+    // 檢查是否是資料庫表格不存在的錯誤
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const isTableNotExist = errorMessage.includes('relation "users" does not exist');
+    
     return NextResponse.json({
       success: false,
-      message: '伺服器內部錯誤'
+      message: isTableNotExist ? '資料庫表格不存在，需要初始化' : '伺服器內部錯誤',
+      error: errorMessage,
+      needsInit: isTableNotExist
     }, { status: 500 });
   }
 }

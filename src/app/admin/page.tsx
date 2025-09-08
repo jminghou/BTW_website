@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import InternalNavbar from '@/components/admin/InternalNavbar';
 import Dashboard from '@/components/admin/Dashboard';
 import ContactsManager from '@/components/admin/ContactsManager';
@@ -31,8 +31,52 @@ export default function AdminPage() {
   const [loginForm, setLoginForm] = useState<LoginForm>({ username: '', password: '' });
   const [loginError, setLoginError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  
+  // 資料庫初始化狀態
+  const [isInitializing, setIsInitializing] = useState(false);
+  const [initMessage, setInitMessage] = useState('');
+  const [showInitButton, setShowInitButton] = useState(true); // 預設顯示，檢查後再隱藏
 
   // 清理不再需要的狀態，現在由各組件管理自己的狀態
+
+  // 檢查資料庫狀態
+  useEffect(() => {
+    const checkDatabaseStatus = async () => {
+      try {
+        const response = await fetch('/api/auth', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            username: 'test',
+            password: 'test'
+          })
+        });
+        
+        const result = await response.json();
+        
+        // 如果資料庫正常且有使用者存在，隱藏初始化按鈕
+        if (result.success) {
+          setShowInitButton(false);
+        } else if (result.needsInit || 
+            result.message?.includes('relation "users" does not exist') || 
+            result.message?.includes('帳號不存在') ||
+            result.message?.includes('資料庫表格不存在')) {
+          setShowInitButton(true);
+        } else {
+          // 其他錯誤情況（如密碼錯誤）可能表示資料庫正常，隱藏初始化按鈕
+          setShowInitButton(false);
+        }
+      } catch (error) {
+        console.log('資料庫狀態檢查失敗:', error);
+        // 如果連接失敗，也顯示初始化按鈕
+        setShowInitButton(true);
+      }
+    };
+
+    checkDatabaseStatus();
+  }, []);
 
   // 登入驗證邏輯 - 從資料庫驗證
   const handleLogin = async (e: React.FormEvent) => {
@@ -40,8 +84,9 @@ export default function AdminPage() {
     setIsLoggingIn(true);
     setLoginError('');
 
+    let response;
     try {
-      const response = await fetch('/api/auth', {
+      response = await fetch('/api/auth', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -63,10 +108,28 @@ export default function AdminPage() {
         }
       } else {
         setLoginError(result.message || '登入失敗，請重新輸入');
+        // 如果是因為資料庫表格不存在的錯誤，顯示初始化按鈕
+        // 檢查是否需要初始化資料庫
+        if (result.needsInit || 
+            result.message?.includes('relation "users" does not exist') ||
+            result.message?.includes('資料庫表格不存在') ||
+            result.message?.includes('帳號不存在或已停用')) {
+          setShowInitButton(true);
+          setLoginError('資料庫尚未初始化，請先點選下方按鈕初始化資料庫');
+        }
       }
     } catch (error) {
       console.error('登入錯誤：', error);
-      setLoginError('網路錯誤，請稍後再試');
+      // 如果是網路錯誤且可能是資料庫表格不存在，顯示初始化按鈕
+      const errorString = error instanceof Error ? error.message : String(error);
+      if (errorString.includes('relation "users" does not exist') || 
+          errorString.includes('users') ||
+          response?.status === 401) {
+        setShowInitButton(true);
+        setLoginError('資料庫可能尚未初始化，請先點選下方按鈕初始化資料庫');
+      } else {
+        setLoginError('網路錯誤，請稍後再試');
+      }
     }
 
     setIsLoggingIn(false);
@@ -85,6 +148,36 @@ export default function AdminPage() {
     const { name, value } = e.target;
     setLoginForm(prev => ({ ...prev, [name]: value }));
     if (loginError) setLoginError(''); // 清除錯誤訊息
+  };
+
+  // 初始化資料庫
+  const handleInitDatabase = async () => {
+    setIsInitializing(true);
+    setInitMessage('');
+
+    try {
+      const response = await fetch('/api/db/init', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setInitMessage('資料庫初始化成功！預設管理員帳號：admin，密碼：5241');
+        setShowInitButton(false);
+        setLoginError('');
+      } else {
+        setInitMessage('初始化失敗：' + (result.message || '未知錯誤'));
+      }
+    } catch (error) {
+      console.error('初始化錯誤：', error);
+      setInitMessage('網路錯誤，請稍後再試');
+    }
+
+    setIsInitializing(false);
   };
 
   // 如果未登入，顯示登入表單
@@ -140,6 +233,33 @@ export default function AdminPage() {
                   {loginError}
                 </div>
               </div>
+            )}
+
+            {initMessage && (
+              <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">
+                <div className="flex items-center">
+                  <span className="mr-2">✅</span>
+                  {initMessage}
+                </div>
+              </div>
+            )}
+
+            {showInitButton && (
+              <button
+                type="button"
+                onClick={handleInitDatabase}
+                disabled={isInitializing}
+                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors mb-4"
+              >
+                {isInitializing ? (
+                  <div className="flex items-center">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    初始化中...
+                  </div>
+                ) : (
+                  '🛠️ 初始化資料庫'
+                )}
+              </button>
             )}
 
             <button
