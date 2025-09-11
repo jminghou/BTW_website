@@ -325,7 +325,7 @@ export default function CompanyData() {
                     <span className="font-semibold text-cyan-600">{region.revenue}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-600">美編進度</span>
+                    <span className="text-gray-600">美編項目</span>
                     <div className="flex flex-wrap justify-end">
                       {region.designProgress.map((item, itemIndex) => (
                         <div key={itemIndex} className="flex items-center">

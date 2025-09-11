@@ -309,7 +309,7 @@ export default function RegionsManager() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-3">
-                美編製作進度
+                美編項目
               </label>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {designOptions.map((option) => {
