@@ -2,6 +2,7 @@
 
 import React from 'react';
 import StandButton from './buttons/stand_buttons';
+import ServiceMap from './ServiceMap';
 
 const Investors = () => {
   // 添加滚动到联系我们部分的函数
@@ -53,11 +54,7 @@ const Investors = () => {
 
       {/* 服務版圖 */}
       <div className="mt-8 mb-8">
-        <img 
-          src="/images/landingpage/map.jpg" 
-          alt="服務版圖" 
-          className="w-full max-w-5xl mx-auto"
-        />
+        <ServiceMap />
       </div>
     </div>
   )
