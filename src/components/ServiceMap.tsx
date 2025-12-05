@@ -26,6 +26,29 @@ const ServiceMap = () => {
       const svg = d3.select(svgRef.current);
       svg.selectAll('*').remove();
 
+      // Add definitions for filters/gradients if needed
+      const defs = svg.append("defs");
+      
+      // Add drop shadow filter
+      const filter = defs.append("filter")
+          .attr("id", "drop-shadow")
+          .attr("height", "130%");
+      
+      filter.append("feGaussianBlur")
+          .attr("in", "SourceAlpha")
+          .attr("stdDeviation", 3)
+          .attr("result", "blur");
+      
+      filter.append("feOffset")
+          .attr("in", "blur")
+          .attr("dx", 2)
+          .attr("dy", 2)
+          .attr("result", "offsetBlur");
+          
+      const feMerge = filter.append("feMerge");
+      feMerge.append("feMergeNode").attr("in", "offsetBlur");
+      feMerge.append("feMergeNode").attr("in", "SourceGraphic");
+
       // Get container dimensions
       const width = containerRef.current?.offsetWidth || 800;
       const height = containerRef.current?.offsetHeight || 600;
@@ -60,13 +83,17 @@ const ServiceMap = () => {
           .append('path')
           .attr('d', pathGenerator as any)
           .attr('id', (d: any) => 'city' + d.properties.COUNTYCODE)
+          .classed('highlighted-region', (d: any) => isHighlighted(d.properties.COUNTYNAME)) // Add class for CSS animation
           .style('fill', (d: any) => 
             isHighlighted(d.properties.COUNTYNAME) ? primaryColor : 'transparent'
           )
           .style('stroke', '#000') // Black strokes for white background
-          .style('cursor', 'pointer')
-          .style('transition', 'fill .2s ease, stroke .2s ease, transform .2s ease')
+          .style('stroke-width', (d: any) => isHighlighted(d.properties.COUNTYNAME) ? '1px' : '0.5px')
+          .style('cursor', (d: any) => isHighlighted(d.properties.COUNTYNAME) ? 'pointer' : 'default')
+          .style('transition', 'all 0.3s ease')
           .on('click', function(event, d: any) {
+            if (!isHighlighted(d.properties.COUNTYNAME)) return; // Only allow clicking highlighted areas
+
             const countyName = d.properties.COUNTYNAME;
             const customData = cityData[countyName];
 
@@ -84,28 +111,35 @@ const ServiceMap = () => {
                .style('fill', (d: any) => 
                  isHighlighted(d.properties.COUNTYNAME) ? primaryColor : 'transparent'
                )
-               .style('stroke', '#000');
+               .style('stroke', '#000')
+               .style('filter', null);
 
             // Then highlight the clicked one
             d3.select(this)
               .classed('active', true)
-              .style('fill', 'rgba(255, 202, 40, 0.5)')
-              .style('stroke', '#FFCA28');
+              .style('fill', '#FFCA28') // Keep the yellow highlight
+              .style('stroke', '#F57F17')
+              .style('filter', 'url(#drop-shadow)');
           })
-          .on('mouseover', function() {
+          .on('mouseover', function(event, d: any) {
+            if (!isHighlighted(d.properties.COUNTYNAME)) return;
+
             const el = d3.select(this);
             if (!el.classed('active')) {
-              el.style('fill', 'rgba(255, 202, 40, 0.5)')
-                .style('stroke', '#FFCA28')
-                .style('transform', 'translateY(-5px)');
+              el.style('fill', '#4dd0e1') // Lighter version of primary color on hover
+                .style('filter', 'url(#drop-shadow)')
+                .style('transform', 'scale(1.01)'); // Slight scale effect
             }
           })
           .on('mouseout', function(event, d: any) {
+            if (!isHighlighted(d.properties.COUNTYNAME)) return;
+
             const el = d3.select(this);
             if (!el.classed('active')) {
-              el.style('fill', isHighlighted(d.properties.COUNTYNAME) ? primaryColor : 'transparent')
+              el.style('fill', primaryColor)
                 .style('stroke', '#000') // Reset to black
-                .style('transform', 'translateY(0)');
+                .style('filter', null)
+                .style('transform', 'scale(1)');
             }
           });
 
@@ -129,13 +163,36 @@ const ServiceMap = () => {
 
   return (
     <div className="w-full text-black p-4 md:p-8 overflow-hidden">
+        {/* Add CSS Animation styles */}
+        <style>{`
+          @keyframes pulse-color {
+            0% { fill: ${primaryColor}; }
+            50% { fill: #b2ebf2; } 
+            100% { fill: ${primaryColor}; }
+          }
+          /* Only animate if not active and not hovered (handled by JS events mostly, but CSS helps initial state) */
+          .highlighted-region:not(.active):not(:hover) {
+            animation: pulse-color 2s infinite ease-in-out;
+          }
+        `}</style>
+
         <div className="flex flex-col md:flex-row items-center justify-between min-h-[500px] md:min-h-[600px]">
             {/* Map Container */}
             <div 
                 ref={containerRef} 
-                className="w-full md:w-1/2 h-[400px] md:h-[600px] flex justify-center items-center"
+                className="w-full md:w-1/2 h-[400px] md:h-[600px] flex justify-center items-center relative"
             >
                 <svg ref={svgRef} className="max-h-full w-full block"></svg>
+                
+                {/* Visual Instruction Overlay */}
+                <div className="absolute bottom-12 w-full flex justify-center pointer-events-none z-10">
+                  <div className="bg-white/90 backdrop-blur-sm px-4 py-2 rounded-full shadow-lg border border-gray-200 flex items-center gap-2 animate-bounce">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
+                    </svg>
+                    <span className="text-sm font-medium text-gray-700 whitespace-nowrap">點擊藍色縣市查看詳細據點</span>
+                  </div>
+                </div>
             </div>
             
             {/* Info Container - 右側資訊欄位 */}
