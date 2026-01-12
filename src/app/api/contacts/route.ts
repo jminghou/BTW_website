@@ -1,11 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { saveContact, getContacts, deleteContact } from '../../../lib/db';
+import nodemailer from 'nodemailer';
 
 /**
  * 聯絡表單 API 路由
- * POST /api/contacts - 儲存聯絡表單資料
+ * POST /api/contacts - 儲存聯絡表單資料並發送通知信
  * GET /api/contacts - 取得所有聯絡表單資料
  */
+
+// 建立郵件傳送器
+const createTransporter = () => {
+  return nodemailer.createTransport({
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: parseInt(process.env.SMTP_PORT || '465'),
+    secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+  });
+};
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,6 +44,70 @@ export async function POST(request: NextRequest) {
     });
 
     if (result.success) {
+      // 資料庫儲存成功後，嘗試發送郵件
+      try {
+        const transporter = createTransporter();
+        
+        // 準備郵件內容
+        const mailOptions = {
+          from: process.env.SMTP_FROM || `"官網聯絡表單" <${process.env.SMTP_USER}>`,
+          to: 'service@haohuagroup.com.tw', // 寄給客服
+          replyTo: user_email, // 設定回信地址為訪客信箱
+          subject: `【官網聯絡通知】${user_name} - ${title}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 5px;">
+              <h2 style="color: #00bed6;">收到新的聯絡表單</h2>
+              <p>有訪客在官網留下了新的訊息，詳細資料如下：</p>
+              
+              <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+                <tr>
+                  <td style="padding: 10px; background-color: #f9f9f9; width: 100px; font-weight: bold;">身份</td>
+                  <td style="padding: 10px; border-bottom: 1px solid #eee;">${identity}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 10px; background-color: #f9f9f9; font-weight: bold;">姓名/單位</td>
+                  <td style="padding: 10px; border-bottom: 1px solid #eee;">${user_name}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 10px; background-color: #f9f9f9; font-weight: bold;">主旨</td>
+                  <td style="padding: 10px; border-bottom: 1px solid #eee;">${title}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 10px; background-color: #f9f9f9; font-weight: bold;">Email</td>
+                  <td style="padding: 10px; border-bottom: 1px solid #eee;"><a href="mailto:${user_email}">${user_email}</a></td>
+                </tr>
+                <tr>
+                  <td style="padding: 10px; background-color: #f9f9f9; font-weight: bold;">電話</td>
+                  <td style="padding: 10px; border-bottom: 1px solid #eee;">${phone || '未提供'}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 10px; background-color: #f9f9f9; font-weight: bold; vertical-align: top;">訊息內容</td>
+                  <td style="padding: 10px; border-bottom: 1px solid #eee; white-space: pre-wrap;">${message}</td>
+                </tr>
+              </table>
+              
+              <div style="margin-top: 30px; font-size: 12px; color: #888; text-align: center;">
+                此郵件由系統自動發送，請勿直接回覆此郵件。<br>
+                若要回覆訪客，請直接點擊上方 Email 連結。
+              </div>
+            </div>
+          `
+        };
+
+        // 發送郵件
+        if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+          await transporter.sendMail(mailOptions);
+          console.log('郵件發送成功');
+        } else {
+          console.warn('未設定 SMTP 資訊，跳過郵件發送');
+        }
+
+      } catch (emailError) {
+        console.error('郵件發送失敗：', emailError);
+        // 注意：即使寄信失敗，我們還是回傳成功，因為資料已經存入資料庫了
+        // 我們只在後台記錄錯誤
+      }
+
       return NextResponse.json({
         success: true,
         message: '聯絡表單提交成功！',

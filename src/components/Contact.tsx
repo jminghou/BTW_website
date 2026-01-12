@@ -2,7 +2,6 @@
 
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import emailjs from '@emailjs/browser';
 
 const Contact = () => {
   const router = useRouter();
@@ -69,8 +68,8 @@ const Contact = () => {
     setSubmitStatus(null);
     
     try {
-      // 1. 儲存到資料庫
-      const dbResponse = await fetch('/api/contacts', {
+      // 呼叫後端 API (儲存資料並寄送通知信)
+      const response = await fetch('/api/contacts', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -78,38 +77,15 @@ const Contact = () => {
         body: JSON.stringify(formData),
       });
 
-      const dbResult = await dbResponse.json();
-      console.log('資料庫儲存結果：', dbResult);
-
-      // 2. 使用Email.js发送邮件
-      const emailResult = await emailjs.send(
-        'service_a5sxzjy',
-        'template_1uojjcj',
-        {
-          identity: formData.identity,
-          user_name: formData.user_name,
-          title: formData.title,
-          user_email: formData.user_email,
-          phone: formData.phone,
-          message: formData.message,
-          // 设置发件人名称为用户填写的名称
-          from_name: formData.user_name,
-          // 收件人设置为service@haohuagroup.com.tw（与发件人相同）
-          to_name: '客服團隊',
-          to_email: 'service@haohuagroup.com.tw',
-          // 设置回复地址为用户的邮箱，方便直接回复
-          reply_to: formData.user_email
-        },
-        'AOvvrQejq7rqpRw--'
-      );
+      const result = await response.json();
       
-      if (emailResult.text === 'OK') {
+      if (result.success) {
         setSubmitStatus({ 
           success: true, 
-          message: dbResult.success 
-            ? '您的訊息已成功送出並儲存，我們會盡快回覆您！' 
-            : '您的訊息已成功送出，我們會盡快回覆您！（資料儲存可能失敗）'
+          message: '您的訊息已成功送出，我們會盡快回覆您！' 
         });
+        
+        // 清空表單
         setFormData({
           identity: '',
           user_name: '',
@@ -122,7 +98,7 @@ const Contact = () => {
           formRef.current.reset();
         }
       } else {
-        throw new Error('郵件發送失敗');
+        throw new Error(result.message || '提交失敗');
       }
     } catch (error) {
       setSubmitStatus({ success: false, message: '提交失敗，請稍後再試或直接聯繫我們。' });
