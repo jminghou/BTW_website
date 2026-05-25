@@ -1,0 +1,432 @@
+/* 定義所有 HarmonyOS Sans TC 字重 */
+@font-face {
+    font-family: 'HarmonyOS Sans TC';
+    src: url('../font/HarmonyOS_Sans_TC_Thin.ttf') format('truetype');
+    font-weight: 100;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'HarmonyOS Sans TC';
+    src: url('../font/HarmonyOS_Sans_TC_Light.ttf') format('truetype');
+    font-weight: 300;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'HarmonyOS Sans TC';
+    src: url('../font/HarmonyOS_Sans_TC_Regular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'HarmonyOS Sans TC';
+    src: url('../font/HarmonyOS_Sans_TC_Bold.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'HarmonyOS Sans TC';
+    src: url('../font/HarmonyOS_Sans_TC_Black.ttf') format('truetype');
+    font-weight: 900;
+    font-style: normal;
+}
+
+html, body {
+    width: 100vw;
+    height: 100vh;
+    margin: 0;
+    padding: 0;
+    background-color: #202a65;
+    background-image: url('../pic/bg-food.png');
+    background-repeat: repeat;
+    background-blend-mode: soft-light;
+    background-size: 470px auto;
+    background-position: center;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: "HarmonyOS Sans TC", "Microsoft JhengHei", sans-serif;
+    font-weight: 400;  /* 使用 Regular 作為預設字重 */
+    color: #202a65;
+    line-height: 1.6;
+}
+
+.container-wrapper {
+    margin: 0 20px;
+    padding: 42px 3px 3px;
+    border-radius: 20px;
+    background: #eeedeb;
+}
+
+.container {
+    margin: 12px;
+    padding: 0 8px;
+    border-radius: 20px;
+    background: #eeedeb;
+}
+
+.date-section {
+    display: flex;
+    align-items: center;
+    background: #eae1c2;
+    margin-bottom: 11px;
+    border-radius: 10px;
+    padding: 2px;
+}
+
+.date-info {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    font-size: 18px;
+    color: #202a65;
+    margin-right: 2px;
+    min-width: 120px;
+    min-height: 160px;
+    text-align: center;
+    line-height: 1.2;
+    white-space: pre-line;
+    background-color: #eae1c2;
+    padding: 10px;
+    border-radius: 4px;
+}
+
+.weekday {
+    font-family: "HarmonyOS Sans TC";
+    font-weight: 700;  /* Bold */
+    font-size: 18px;
+    margin-bottom: 4px;
+}
+
+.day {
+    font-family: "HarmonyOS Sans TC";
+    font-weight: 900;  /* Black */
+    font-size: 48px;
+}
+
+.restaurants-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    flex: 1;
+    align-items: center;
+}
+
+.restaurant-section {
+    padding:8px;
+    background: #eae1c2;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    min-height: 160px;
+    border-left: dashed 1.5px #202a65;
+}
+
+.menu-content {
+    display: flex;
+    gap: 20px;
+    width: 100%;
+    align-items: center;
+    height: 100%;
+}
+
+.restaurant-info {
+    width: 166px;
+    flex-shrink: 0;
+    padding-left: 10px;
+}
+
+.restaurant-name {
+    font-weight: 900;
+    font-size: 21px;
+    color: #202a65;
+    word-break: break-word;
+    margin-left: 12px;
+}
+
+.menu-details {
+    flex: 1;
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    height: 100%;
+}
+
+.menu-image {
+    width: 150px;
+    height: 150px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.menu-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 4px;
+    max-width: 100%;
+    max-height: 100%;
+}
+
+.menu-items {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.menu-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.menu-name {
+    display: flex;
+    flex-direction: column;
+}
+
+.chinese-name {
+    font-size: 19px;
+    font-weight: 700;  /* Bold */
+}
+
+.english-name {
+    font-weight: 400;  /* Regular */
+    font-size: 14px;
+    color: #202a65;
+    margin-top: -4px;
+}
+
+.price {
+    color: #e74c3c;
+    min-width: 70px;
+    text-align: right;
+    margin-right: 10px;
+    display: flex;
+    justify-content: flex-end;  /* 確保右對齊 */
+    align-items: baseline;      /* 同大小的文字底部對齊 */
+    gap: 4px;                  /* 設定 NT$ 和數字之間的間距 */
+}
+
+.price-prefix {
+    font-weight: 700;          /* Regular */
+    font-size: 12px;           /* 較小的字體大小 */
+}
+
+.price-number {
+    font-weight: 700;          /* Bold */
+    font-size: 21px;           /* 較大的字體大小 */
+}
+
+@media (max-width: 992px) {
+    .restaurants-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .menu-content {
+        flex-direction: column;
+    }
+
+    .restaurant-info {
+        width: 100%;
+        margin-bottom: 10px;
+    }
+
+    .menu-details {
+        flex-direction: column;
+    }
+
+    .menu-image {
+        width: 100%;
+        height: 150px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+}
+
+@media (max-width: 576px) {
+    .menu-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 5px;
+    }
+
+    .price {
+        text-align: left;
+        justify-content: flex-start;  /* 左對齊 */
+    }
+}
+
+/* 新增的框架樣式 */
+.frame {
+    width: 1920px;  /* 固定寬度 */
+    height: 1080px; /* 固定高度 */
+    margin: 0 auto;
+    border-radius: 20px;
+}
+
+.edm-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 0;
+    margin: 0;
+    border-radius: 0;
+    background: none;
+}
+
+.title-left {
+    display: flex;
+    align-items: center;
+    border-radius: 32px 32px 0 0;
+    padding: 0 62px 0 32px;
+    margin: 10px 0px -52px 20px;
+    background: #eeedeb;
+    gap: 18px;
+}
+
+.title-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+.title-right img {
+    height: 62px;
+    width: auto;
+    object-fit: contain;
+    display: block;
+    padding: 10px 38px 10px 0;
+}
+
+.title-right-text {
+    color: #202a65;
+    font-size: 20px;
+    font-weight: 500;
+    padding: 0 0 0 8px;
+    margin: 2px 46px -40px 0;
+    white-space: pre-line;
+    text-align: right;
+    letter-spacing: 0.5px;
+}
+
+.title-info-group {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.title-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #202a65;
+}
+
+.info-label {
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.info-value {
+    font-size: 45px;
+    font-weight: 700;
+}
+
+.info-location {
+        font-size: 42px;
+        font-weight: 900;
+        color: #ffffff;
+        background-color: #202a65;
+        padding: 0px 10px;
+        border-radius: 12px;
+    }
+
+.title-logo {
+    max-height: 80px;
+    width: auto;
+    object-fit: contain;
+}
+
+/* 紧凑样式 - 用于天数大于2天且餐点数超过3个的情况 */
+.restaurant-section.compact-style {
+    min-height: 160px;  /* 保持原高度 */
+    overflow-y: auto;   /* 允许垂直滚动 */
+    max-height: 320px;  /* 设置最大高度，避免过高 */
+}
+
+.menu-items.compact-style {
+    gap: 0;  /* 减少菜单项之间的间距 */
+    max-height: none;  /* 移除最大高度限制 */
+}
+
+.menu-row.compact-style {
+    margin-bottom: 2px;  /* 减小行距 */
+}
+
+.menu-name.compact-style {
+    margin-bottom: 0;  /* 减少底部间距 */
+}
+
+.chinese-name.compact-style {
+    font-size: 16px;  /* 减小中文名称字体大小 */
+    line-height: 1.2;  /* 缩小行高 */
+}
+
+.english-name.compact-style {
+    font-size: 12px;  /* 减小英文名称字体大小 */
+    line-height: 1.1;  /* 缩小行高 */
+    margin-top: -2px;  /* 减少与中文名称的间距 */
+}
+
+.price.compact-style {
+    min-width: 60px;  /* 减小价格区域宽度 */
+}
+
+.price-prefix.compact-style {
+    font-size: 10px;  /* 减小价格前缀字体大小 */
+}
+
+.price-number.compact-style {
+    font-size: 18px;  /* 减小价格数字字体大小 */
+}
+
+@media (max-width: 1200px) {
+    .edm-title {
+        padding: 8px 16px 0px 8px;
+        gap: 16px;
+    }
+    .edm-title-right-logo img {
+        height: 40px;
+    }
+}
+
+@media (max-width: 768px) {
+    .edm-title {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    .title-right {
+        margin-left: 0;
+        margin-top: 8px;
+        width: 100%;
+        justify-content: flex-start;
+    }
+}

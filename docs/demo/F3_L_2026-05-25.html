@@ -1,0 +1,459 @@
+
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>餐廳菜單</title>
+    <link rel="stylesheet" href="../../css/vis_ad_machine.css">
+    
+    <style>
+        /* 新版 3欄式佈局樣式 */
+        .main-layout {
+            display: flex;
+            position: absolute;
+            left: 260px; /* 側邊欄右側 */
+            top: 60px;
+            width: 1600px;
+            height: 960px;
+            gap: 40px;
+        }
+
+        /* 中間欄位：大圖展示區 */
+        .spotlight-section {
+            width: 800px;
+            background: #ffffff;
+            border-radius: 20px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* 輪播項目容器 */
+        .spotlight-item {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            padding: 20px; /* Match parent padding */
+            box-sizing: border-box; /* Ensure padding is included in width/height */
+            display: flex;
+            flex-direction: column;
+            background: #ffffff; /* Ensure background covers underlying items */
+            opacity: 0;
+            transition: opacity 1s ease-in-out;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .spotlight-item.active {
+            opacity: 1;
+            pointer-events: auto;
+            z-index: 2;
+        }
+
+        .spotlight-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .spotlight-header img {
+            height: 40px;
+            width: auto;
+        }
+
+        .spotlight-image-container {
+            flex: 1;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #fff;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 5px; /* Reduced margin */
+            position: relative;
+        }
+
+        .spotlight-number-badge {
+            position: absolute;
+            top: -15px;
+            left: -15px;
+            width: auto;
+            height: auto;
+            z-index: 10;
+        }
+
+        .spotlight-image-container .spotlight-main-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* Change to cover to fill */
+            object-position: center;
+        }
+
+        /* 餐廳名稱標籤 (移到圖片下方) */
+        .spotlight-restaurant-tag {
+            display: inline-block;
+            background-color: #17a1b1;
+            color: white;
+            padding: 8px 24px;
+            border-radius: 50px;
+            font-size: 20px;
+            font-weight: 700;
+            margin-top: 10px;
+            margin-bottom: 10px;
+            align-self: flex-start;
+        }
+
+        /* 分隔線 */
+        .spotlight-separator {
+            width: 100%;
+            border-top: 2px dashed #999;
+            margin-bottom: 10px;
+        }
+
+        .spotlight-info {
+            padding: 5px 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-top: auto; /* Push to bottom */
+        }
+
+        .spotlight-names {
+            flex: 1;
+            text-align: left;
+        }
+
+        .spotlight-chinese-name {
+            font-size: 47px; /* Reduced from 48px */
+            font-weight: 900;
+            color: #000;
+            margin-bottom: 2px;
+            line-height: 1.2;
+        }
+
+        .spotlight-english-name {
+            font-size: 21px; /* Reduced from 24px */
+            color: #000;
+            font-weight: 400;
+            line-height: 1.2;
+        }
+
+        .spotlight-price-block {
+            display: flex;
+            align-items: baseline;
+            justify-content: flex-end;
+            color: #a32224;
+            margin-left: 20px;
+        }
+
+        .spotlight-price-prefix {
+            font-size: 21px;
+            font-weight: 700;
+            margin-right: 5px;
+        }
+
+        .spotlight-price {
+            font-size: 64px; /* Slightly reduced to fit better at bottom */
+            font-weight: 900;
+            line-height: 1;
+        }
+
+        /* 右側欄位：餐點列表 */
+        .menu-list-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            overflow-y: auto;
+            padding-right: 20px;
+        }
+
+        /* 密集模式 (> 6 items) */
+        .menu-list-section.dense {
+            gap: 5px;
+        }
+        
+        /* 全局背景色設定 */
+        html, body {
+            background-color: #EAE1C2;
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 確保容器也延伸背景 */
+        .container {
+             background-color: #EAE1C2;
+             min-height: 100vh;
+             width: 100%;
+        }
+
+        /* 隱藏捲軸但保留功能 */
+        .menu-list-section::-webkit-scrollbar {
+            width: 6px;
+        }
+        .menu-list-section::-webkit-scrollbar-thumb {
+            background-color: rgba(0,0,0,0.2);
+            border-radius: 3px;
+        }
+
+        .restaurant-group-header {
+            display: inline-block;
+            background-color: #17a1b1;
+            color: white;
+            padding: 8px 24px;
+            border-radius: 50px;
+            font-size: 20px;
+            font-weight: 700;
+            margin-top: 10px;
+            margin-bottom: 5px;
+            align-self: flex-start;
+        }
+
+        .menu-list-item {
+            display: flex;
+            align-items: center;
+            padding: 10px 20px;
+            border-bottom: 2px dashed #999; /* 虛線分隔 */
+            background-color: transparent;
+            transition: all 0.3s ease;
+            position: relative; /* For arrow positioning */
+        }
+
+        /* 密集模式下的項目 */
+        .menu-list-section.dense .menu-list-item {
+            padding: 5px 20px;
+        }
+
+        /* 最後一個項目不顯示虛線 */
+        .menu-list-item:last-child {
+            border-bottom: none;
+        }
+
+        /* 輪播到的項目 (Active) */
+        .menu-list-item.active {
+            background-color: #ffffff;
+            border: 2px solid #a32224; /* 紅色邊框 */
+            border-radius: 16px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            margin-bottom: 5px; /* Add margin to separate from next dashed line if needed */
+        }
+
+        /* 紅色三角形箭頭 */
+        .menu-list-item.active::before {
+            content: '';
+            position: absolute;
+            left: -15px; /* Adjust position */
+            top: 50%;
+            transform: translateY(-50%);
+            width: 0;
+            height: 0;
+            border-top: 10px solid transparent;
+            border-bottom: 10px solid transparent;
+            border-right: 15px solid #a32224;
+        }
+
+        .item-number-badge {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background-color: #17a1b1;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: 900;
+            margin-right: 20px;
+            flex-shrink: 0;
+        }
+
+        .menu-list-item.active .item-number-badge {
+            background-color: #a32224; /* Active時變紅色 */
+        }
+
+        .item-info {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .item-name {
+            font-size: 32px;
+            font-weight: 700;
+            color: #202a65;
+            margin-bottom: 2px;
+            line-height: 1.2;
+        }
+
+        .item-english-name {
+            font-size: 26px;
+            color: #666;
+            font-weight: 400;
+            line-height: 1.2;
+            }
+
+        .item-price-block {
+            font-size: 38px;
+            font-weight: 900;
+            color: #a32224;
+            white-space: nowrap;
+            margin-left: 20px;
+        }
+        
+        .item-price-prefix {
+            font-size: 18px;
+            font-weight: 700;
+        }
+        
+        /* 側邊欄調整 */
+        .sidebar {
+            z-index: 100; /* 確保在最上層 */
+        }
+        
+        /* 隱藏舊的 menu-grid */
+        .menu-grid {
+            display: none !important;
+        }
+    </style>
+    
+</head>
+<body>
+    <div class="container">
+
+        <div class="sidebar">
+            <div class="logo-info">
+                <img src="../../pic/VIS_logo.png" alt="VIS Logo">
+            </div>
+            <div class="info-block date-info">
+                <div class="weekday">MON</div>
+                <div class="day">25</div>
+            </div>
+            <div class="info-block location-info">
+                <div class="location">FAB 3</div>
+            </div>
+            <div class="info-block meal-time-info">
+                <div class="meal-time">午餐</div>
+            </div>
+            <div class="date-text-info">
+                <div class="date-text">2026.05.25</div>
+                <div class="notice-text">本系列餐點限VIS員工餐廳內供應，配菜依照季節調整</div>
+            </div>
+            <div class="bottom-logo-info">
+                <img src="../../pic/btw_logo-vis.png" alt="BTW Logo">
+            </div>
+        </div>
+        <div class="main-layout"><div class="spotlight-section">
+                <div class="spotlight-item active">
+                    <div class="spotlight-image-container">
+                        <img class="spotlight-number-badge" src="../../pic/numbers/01.png" alt="1">
+                        <img class="spotlight-main-image" src="https://www.bythewaylife.com.tw/btwFile/Meals/6dbb64ce-613e-413f-8387-914a8fc3cf6d_牛肉咖哩蛋包飯.png" alt="牛肉咖哩蛋包飯">
+                    </div>
+                    
+                    <div class="spotlight-restaurant-tag">義式就好</div>
+                    <div class="spotlight-separator"></div>
+
+                    <div class="spotlight-info">
+                        <div class="spotlight-names">
+                            <div class="spotlight-chinese-name">牛肉咖哩蛋包飯</div>
+                            <div class="spotlight-english-name">Beef Curry Omelet Rice</div>
+                        </div>
+                        <div class="spotlight-price-block">
+                            <span class="spotlight-price-prefix">NT$</span>
+                            <span class="spotlight-price">125</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="spotlight-item ">
+                    <div class="spotlight-image-container">
+                        <img class="spotlight-number-badge" src="../../pic/numbers/02.png" alt="2">
+                        <img class="spotlight-main-image" src="https://www.bythewaylife.com.tw/btwFile/Meals/487b5a77-f7ee-4807-a940-1662bba7b2e5_黃金豬排咖哩蛋包飯.png" alt="黃金豬排咖哩蛋包飯">
+                    </div>
+                    
+                    <div class="spotlight-restaurant-tag">義式就好</div>
+                    <div class="spotlight-separator"></div>
+
+                    <div class="spotlight-info">
+                        <div class="spotlight-names">
+                            <div class="spotlight-chinese-name">黃金豬排咖哩蛋包飯</div>
+                            <div class="spotlight-english-name">Pork Chop Curry Omelet Rice</div>
+                        </div>
+                        <div class="spotlight-price-block">
+                            <span class="spotlight-price-prefix">NT$</span>
+                            <span class="spotlight-price">135</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="spotlight-item ">
+                    <div class="spotlight-image-container">
+                        <img class="spotlight-number-badge" src="../../pic/numbers/03.png" alt="3">
+                        <img class="spotlight-main-image" src="https://www.bythewaylife.com.tw/btwFile/Meals/bd1f00b6-b54d-4ea5-acaa-d0927db59421_親子丼蓋飯.png" alt="親子丼蓋飯">
+                    </div>
+                    
+                    <div class="spotlight-restaurant-tag">義式就好</div>
+                    <div class="spotlight-separator"></div>
+
+                    <div class="spotlight-info">
+                        <div class="spotlight-names">
+                            <div class="spotlight-chinese-name">親子丼蓋飯</div>
+                            <div class="spotlight-english-name">Chicken and Egg Donburi</div>
+                        </div>
+                        <div class="spotlight-price-block">
+                            <span class="spotlight-price-prefix">NT$</span>
+                            <span class="spotlight-price">135</span>
+                        </div>
+                    </div>
+                </div>
+                </div><div class="menu-list-section"><div class="restaurant-group-header">義式就好</div>
+            <div class="menu-list-item active">
+                <div class="item-number-badge">1</div>
+                <div class="item-info">
+                    <div class="item-name">牛肉咖哩蛋包飯</div>
+                    <div class="item-english-name">Beef Curry Omelet Rice</div>
+                </div>
+                <div class="item-price-block">
+                    <span class="item-price-prefix">NT$</span>
+                    125
+                </div>
+            </div>
+            
+            <div class="menu-list-item ">
+                <div class="item-number-badge">2</div>
+                <div class="item-info">
+                    <div class="item-name">黃金豬排咖哩蛋包飯</div>
+                    <div class="item-english-name">Pork Chop Curry Omelet Rice</div>
+                </div>
+                <div class="item-price-block">
+                    <span class="item-price-prefix">NT$</span>
+                    135
+                </div>
+            </div>
+            
+            <div class="menu-list-item ">
+                <div class="item-number-badge">3</div>
+                <div class="item-info">
+                    <div class="item-name">親子丼蓋飯</div>
+                    <div class="item-english-name">Chicken and Egg Donburi</div>
+                </div>
+                <div class="item-price-block">
+                    <span class="item-price-prefix">NT$</span>
+                    135
+                </div>
+            </div>
+            </div></div>
+    </div>
+    <script src="../../js/spotlight_slideshow.js"></script>
+</body>
+</html>

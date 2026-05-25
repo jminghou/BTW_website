@@ -1,0 +1,110 @@
+import { NextRequest, NextResponse } from 'next/server';
+import {
+  getScreenByKey,
+  getSchedulesByScreenKey,
+  getPlaylistItemsByPlaylistId,
+} from '@/lib/signage/db';
+import { matchSchedule, type ScheduleRow } from '@/lib/signage/schedule';
+
+/**
+ * 播放器核心 API
+ * GET /api/signage/player/[key]
+ *
+ * 對應 v2.0 backend/api/player.py:get_current_schedule
+ * 由螢幕端定期輪詢，回傳當前該播放的清單
+ *
+ * 加 Cache-Control: max-age=60 讓 Vercel Edge 與瀏覽器可快取一分鐘
+ * → 降低對 Neon DB 的擊穿次數（讓 DB 能 auto-suspend 省運算時數）
+ */
+export async function GET(
+  req: NextRequest,
+  { params }: { params: { key: string } },
+) {
+  const key = params.key;
+
+  if (!key) {
+    return NextResponse.json({
+      status: 'error',
+      message: '缺少 screen key 參數',
+    }, { status: 400 });
+  }
+
+  try {
+    // 1. 找螢幕
+    const screenResult = await getScreenByKey(key);
+    if (!screenResult.success || !screenResult.data) {
+      return NextResponse.json({
+        status: 'error',
+        message: '找不到對應的螢幕',
+      }, { status: 404 });
+    }
+    const screen = screenResult.data as { id: number; name: string };
+
+    // 2. 取該螢幕所有排程
+    const schedulesResult = await getSchedulesByScreenKey(key);
+    if (!schedulesResult.success) {
+      return NextResponse.json({
+        status: 'error',
+        message: '取得排程失敗',
+      }, { status: 500 });
+    }
+    const schedules = (schedulesResult.data as unknown as ScheduleRow[]) ?? [];
+
+    // 3. 匹配當前排程
+    const matched = matchSchedule(schedules);
+    if (!matched) {
+      return NextResponse.json({
+        status: 'idle',
+        message: '目前無排程',
+        items: [],
+        screen_name: screen.name,
+        current_time: new Date().toISOString(),
+      }, {
+        headers: { 'Cache-Control': 'public, max-age=60, s-maxage=60' },
+      });
+    }
+
+    // 4. 取出該排程對應的播放清單項目
+    const itemsResult = await getPlaylistItemsByPlaylistId(matched.playlist_id);
+    if (!itemsResult.success) {
+      return NextResponse.json({
+        status: 'error',
+        message: '取得播放清單項目失敗',
+      }, { status: 500 });
+    }
+    const rawItems = (itemsResult.data as unknown as Array<{
+      asset_id: number;
+      filename: string;
+      blob_url: string;
+      duration_seconds: number;
+      description: string | null;
+    }>) ?? [];
+
+    // 透過 proxy 路由提供 .html，避免 Vercel Blob 的 attachment disposition
+    // 讓 iframe 能正常嵌入渲染（而非觸發下載）
+    const items = rawItems.map(it => ({
+      url: `/api/signage/asset/${it.asset_id}`,
+      duration: it.duration_seconds,
+      filename: it.filename,
+      description: it.description,
+    }));
+
+    return NextResponse.json({
+      status: 'playing',
+      playlist_name: matched.playlist_name,
+      playlist_id: matched.playlist_id,
+      schedule_id: matched.id,
+      items,
+      screen_name: screen.name,
+      current_time: new Date().toISOString(),
+    }, {
+      headers: { 'Cache-Control': 'public, max-age=60, s-maxage=60' },
+    });
+  } catch (error) {
+    console.error('播放器 API 錯誤：', error);
+    return NextResponse.json({
+      status: 'error',
+      message: '伺服器內部錯誤',
+    }, { status: 500 });
+  }
+}

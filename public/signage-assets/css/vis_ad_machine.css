@@ -1,0 +1,281 @@
+/* 定義所有 HarmonyOS Sans TC 字重 */
+@font-face {
+    font-family: 'HarmonyOS Sans TC';
+    src: url('../font/HarmonyOS_Sans_TC_Thin.ttf') format('truetype');
+    font-weight: 100;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'HarmonyOS Sans TC';
+    src: url('../font/HarmonyOS_Sans_TC_Light.ttf') format('truetype');
+    font-weight: 300;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'HarmonyOS Sans TC';
+    src: url('../font/HarmonyOS_Sans_TC_Regular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'HarmonyOS Sans TC';
+    src: url('../font/HarmonyOS_Sans_TC_Bold.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'HarmonyOS Sans TC';
+    src: url('../font/HarmonyOS_Sans_TC_Black.ttf') format('truetype');
+    font-weight: 900;
+    font-style: normal;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: "HarmonyOS Sans TC", "Microsoft JhengHei", sans-serif;
+    font-weight: 400;
+    color: #202a65;
+    line-height: 1.6;
+    margin: 0;
+    padding: 0;
+    width: 1920px;
+    height: 1080px;
+    background: transparent !important;
+}
+
+.container {
+    width: 1920px;
+    height: 1080px;
+    position: relative;
+    background-color: #eae1c2;
+    display: grid;
+    align-content: center;
+}
+
+.menu-grid {
+    margin-left: 281px;
+    display: grid;
+    grid-template-columns: repeat(4, 360px);
+    gap: 40px;
+    justify-content: start;
+    align-content: center;
+    text-align: center;
+}
+
+.menu-item {
+    display: grid;
+    justify-content: center;
+    align-content: center;
+    text-align: center;
+    place-content: center;
+    width: 360px;
+    height: 469px;
+    background-color: #ffffff;
+    border-radius: 20px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.restaurant-name {
+    color: #17a1b1;
+    font-size: 20px;
+    font-weight: 700;
+    text-align: center;
+    width: 100%;
+    margin-top: 10px;
+    margin-bottom: 6px;
+}
+
+.menu-image {
+    width: 244px;
+    height: 244px;
+    object-fit: contain;
+    display: block;
+    margin: 0 auto;
+}
+
+.chinese-name {
+    display: block;
+    font-size: 34px;
+    font-weight: 700;
+    color: #000;
+    margin-top: -6px;
+}
+
+.english-name {
+    display: block;
+    font-size: 15px;
+    font-weight: 400;
+    color: #000;
+    max-width: 100%;
+    margin-top: -6px;
+}
+
+.description {
+    font-size: 12px;
+    font-weight: 400;
+    color: #888;
+    line-height: 1;
+    max-width: 100%;
+    text-align: center;
+}
+
+.price {
+    display: block;
+    align-items: baseline;
+    gap: 4px;
+    margin-top: -6px;
+}
+
+.price-prefix {
+    font-size: 16px;
+    font-weight: 700;
+    color: #a32224;
+}
+
+.price-number {
+    font-size: 52px;
+    font-weight: 900;
+    color: #a32224;
+}
+
+.sidebar {
+    position: absolute;
+    left: 80px;
+    top: 59px;
+    display: grid;
+    gap: 15px;
+}
+
+.date-info {
+    transform: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background-color: #192354;
+    border-radius: 10px;
+    color: #ffffff;
+    width: 141px;
+    height: 142px;
+    box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.location-info {
+    /* 調整位置在日期區塊下方 */
+    transform: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    background-color: #192354;
+    border-radius: 10px;
+    color: #ffffff;
+    width: 141px;
+    height: 65px;
+    box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.weekday {
+    font-size: 32px;
+    font-weight: 700;
+    margin-top: 4px;
+}
+
+.day {
+    font-size: 74px;
+    font-weight: 900;
+    line-height: 1;
+}
+
+.location {
+    font-size: 37px;
+    font-weight: 700;
+    line-height: 1;
+    text-align: center;
+    margin-top: 14px;
+}
+
+
+/* Logo 區塊樣式 */
+.logo-info {
+    transform: none;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 141px;
+    background-color: transparent;
+}
+
+/* 底部 Logo 區塊樣式 */
+.bottom-logo-info {
+    transform: none;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 141px;
+    background-color: transparent;
+}
+
+.logo-info img,
+.bottom-logo-info img {
+    width: 141px;
+    height: auto;
+    object-fit: contain;
+}
+
+.meal-time-info {
+    /* 調整位置在據點區塊下方 */
+    transform: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    background-color: #192354;
+    border-radius: 10px;
+    color: #ffffff;
+    width: 141px;
+    height: 65px;
+    box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.meal-time {
+    font-size: 37px;
+    font-weight: 700;
+    line-height: 1;
+    text-align: center;
+    margin-top: 14px;
+}
+
+/* 日期文字區塊 */
+.date-text-info {
+    transform: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+    width: 141px;
+}
+
+.date-text {
+    font-size: 22px;
+    font-weight: 900;
+    line-height: 1.2;
+    text-align: center;
+    color: #192354;
+}
+
+.notice-text {
+    font-size: 20px;
+    font-weight: 400;
+    line-height: 1.4;
+    text-align: center;
+    color: #2f3864;
+}
