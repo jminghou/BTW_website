@@ -93,6 +93,20 @@ export async function createSignageTables() {
       );
     `;
 
+    // 各廠區的餐期時段設定（一鍵列表轉排程依此判斷餐期對應的播放時間）
+    await sql`
+      CREATE TABLE IF NOT EXISTS signage_meal_slots (
+        id SERIAL PRIMARY KEY,
+        site_id INTEGER NOT NULL REFERENCES signage_sites(id) ON DELETE CASCADE,
+        meal_key VARCHAR(4) NOT NULL,
+        start_time TIME NOT NULL,
+        end_time TIME NOT NULL,
+        enabled BOOLEAN NOT NULL DEFAULT true,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (site_id, meal_key)
+      );
+    `;
+
     console.log('看版系統資料表建立成功！');
     return { success: true, message: '看版系統資料表建立成功' };
   } catch (error) {
@@ -189,6 +203,25 @@ export async function getSites(regionId?: number) {
           ORDER BY s.id ASC;
         `;
     return { success: true, data: result };
+  } catch (error) {
+    console.error('取得廠區時發生錯誤：', error);
+    return { success: false, error };
+  }
+}
+
+export async function getSiteById(id: number) {
+  try {
+    const result = await sql`
+      SELECT s.id, s.region_id, s.name, s.code, s.description, r.name AS region_name
+      FROM signage_sites s
+      LEFT JOIN signage_regions r ON s.region_id = r.id
+      WHERE s.id = ${id}
+      LIMIT 1;
+    `;
+    if (result.length === 0) {
+      return { success: false, error: '找不到指定的廠區' };
+    }
+    return { success: true, data: result[0] };
   } catch (error) {
     console.error('取得廠區時發生錯誤：', error);
     return { success: false, error };
@@ -565,6 +598,65 @@ export async function deletePlaylist(id: number) {
   }
 }
 
+export async function batchDeletePlaylists(ids: number[]) {
+  try {
+    if (ids.length === 0) {
+      return { success: false, error: '未提供要刪除的播放清單 ID' };
+    }
+    const result = await sql`
+      DELETE FROM signage_playlists WHERE id = ANY(${ids})
+      RETURNING id, name;
+    `;
+    return { success: true, data: result };
+  } catch (error) {
+    console.error('批次刪除播放清單時發生錯誤：', error);
+    return { success: false, error };
+  }
+}
+
+/**
+ * 一鍵素材轉列表：把該廠區的每個素材各建一個同名播放清單（含 1 個 item）
+ * 對應 v2.0 admin.py auto-create-from-assets，但 duration 預設 180 秒。
+ * 同名清單已存在則跳過。回傳 { created, skipped }。
+ */
+export async function autoCreatePlaylistsFromAssets(siteId: number, durationSeconds = 180) {
+  try {
+    const assets = await sql`
+      SELECT id, filename FROM signage_assets WHERE site_id = ${siteId} ORDER BY filename ASC;
+    `;
+    const existing = await sql`
+      SELECT name FROM signage_playlists WHERE site_id = ${siteId};
+    `;
+    const existingNames = new Set((existing as Array<{ name: string }>).map(p => p.name));
+
+    let created = 0;
+    let skipped = 0;
+    for (const asset of assets as Array<{ id: number; filename: string }>) {
+      if (existingNames.has(asset.filename)) {
+        skipped++;
+        continue;
+      }
+      const inserted = await sql`
+        INSERT INTO signage_playlists (site_id, name, description)
+        VALUES (${siteId}, ${asset.filename}, ${'自動建立自素材: ' + asset.filename})
+        RETURNING id;
+      `;
+      const playlistId = (inserted[0] as { id: number }).id;
+      await sql`
+        INSERT INTO signage_playlist_items (playlist_id, asset_id, duration_seconds, "order")
+        VALUES (${playlistId}, ${asset.id}, ${durationSeconds}, 0);
+      `;
+      existingNames.add(asset.filename);
+      created++;
+    }
+
+    return { success: true, data: { created, skipped, total: assets.length } };
+  } catch (error) {
+    console.error('一鍵素材轉列表時發生錯誤：', error);
+    return { success: false, error };
+  }
+}
+
 /**
  * 取代整份播放清單的項目（刪除舊的、插入新的）
  * 適合用在拖曳排序後一次性更新
@@ -588,6 +680,235 @@ export async function replacePlaylistItems(
     return { success: true, data: { playlist_id: playlistId, count: items.length } };
   } catch (error) {
     console.error('更新播放清單項目時發生錯誤：', error);
+    return { success: false, error };
+  }
+}
+
+// ==================== 餐期時段設定（每廠區） ====================
+
+export interface MealSlot {
+  meal_key: 'B' | 'L' | 'D' | 'N';
+  start_time: string; // "HH:MM" 或 "HH:MM:SS"
+  end_time: string;
+  enabled: boolean;
+}
+
+const MEAL_ORDER: MealSlot['meal_key'][] = ['B', 'L', 'D', 'N'];
+const MEAL_DEFAULTS: Record<MealSlot['meal_key'], { start: string; end: string; enabled: boolean }> = {
+  B: { start: '06:00:00', end: '10:00:00', enabled: false },
+  L: { start: '10:00:00', end: '15:00:00', enabled: true },
+  D: { start: '15:00:00', end: '20:00:00', enabled: true },
+  N: { start: '21:00:00', end: '02:00:00', enabled: true }, // 結束<開始 → 跨日
+};
+
+async function ensureMealSlotsTable() {
+  await sql`
+    CREATE TABLE IF NOT EXISTS signage_meal_slots (
+      id SERIAL PRIMARY KEY,
+      site_id INTEGER NOT NULL REFERENCES signage_sites(id) ON DELETE CASCADE,
+      meal_key VARCHAR(4) NOT NULL,
+      start_time TIME NOT NULL,
+      end_time TIME NOT NULL,
+      enabled BOOLEAN NOT NULL DEFAULT true,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE (site_id, meal_key)
+    );
+  `;
+}
+
+/** 取得某廠區的餐期設定；若尚未設定則先植入預設值 */
+export async function getMealSlots(siteId: number) {
+  try {
+    await ensureMealSlotsTable();
+    let rows = await sql`
+      SELECT meal_key, start_time, end_time, enabled
+      FROM signage_meal_slots WHERE site_id = ${siteId};
+    `;
+    if (rows.length === 0) {
+      for (const key of MEAL_ORDER) {
+        const d = MEAL_DEFAULTS[key];
+        await sql`
+          INSERT INTO signage_meal_slots (site_id, meal_key, start_time, end_time, enabled)
+          VALUES (${siteId}, ${key}, ${d.start}, ${d.end}, ${d.enabled})
+          ON CONFLICT (site_id, meal_key) DO NOTHING;
+        `;
+      }
+      rows = await sql`
+        SELECT meal_key, start_time, end_time, enabled
+        FROM signage_meal_slots WHERE site_id = ${siteId};
+      `;
+    }
+    // 依固定順序回傳
+    const map = new Map((rows as Array<{ meal_key: string; start_time: string; end_time: string; enabled: boolean }>).map(r => [r.meal_key, r]));
+    const ordered = MEAL_ORDER.map(k => {
+      const r = map.get(k);
+      return {
+        meal_key: k,
+        start_time: r ? String(r.start_time).substring(0, 5) : MEAL_DEFAULTS[k].start.substring(0, 5),
+        end_time: r ? String(r.end_time).substring(0, 5) : MEAL_DEFAULTS[k].end.substring(0, 5),
+        enabled: r ? r.enabled : MEAL_DEFAULTS[k].enabled,
+      };
+    });
+    return { success: true, data: ordered };
+  } catch (error) {
+    console.error('取得餐期設定時發生錯誤：', error);
+    return { success: false, error };
+  }
+}
+
+/** 更新某廠區的餐期設定 */
+export async function updateMealSlots(siteId: number, slots: MealSlot[]) {
+  try {
+    await ensureMealSlotsTable();
+    for (const s of slots) {
+      if (!MEAL_ORDER.includes(s.meal_key)) continue;
+      await sql`
+        INSERT INTO signage_meal_slots (site_id, meal_key, start_time, end_time, enabled, updated_at)
+        VALUES (${siteId}, ${s.meal_key}, ${s.start_time}, ${s.end_time}, ${s.enabled}, CURRENT_TIMESTAMP)
+        ON CONFLICT (site_id, meal_key)
+        DO UPDATE SET start_time = EXCLUDED.start_time, end_time = EXCLUDED.end_time,
+                      enabled = EXCLUDED.enabled, updated_at = CURRENT_TIMESTAMP;
+      `;
+    }
+    return { success: true };
+  } catch (error) {
+    console.error('更新餐期設定時發生錯誤：', error);
+    return { success: false, error };
+  }
+}
+
+/** 把「開始-結束」展開成排程時段；結束<=開始視為跨日，拆成兩段 */
+function buildSegments(start: string, end: string): { start: string; end: string; nextDay?: boolean }[] {
+  const s = start.length === 5 ? `${start}:00` : start;
+  const e = end.length === 5 ? `${end}:00` : end;
+  if (e > s) return [{ start: s, end: e }];
+  // 跨日：當日到 23:59:59 + 隔日 00:00:00 到結束
+  return [
+    { start: s, end: '23:59:59' },
+    { start: '00:00:00', end: e, nextDay: true },
+  ];
+}
+
+/**
+ * 一鍵列表轉排程：依播放清單內素材的檔名自動產生排程
+ * 對應 v2.0 admin.py auto_generate_schedules，但時段改讀「各廠區餐期設定」。
+ *
+ * 檔名格式：*_([BLDN])_(YYYY-MM-DD).html，只處理該廠區「已啟用」的餐期。
+ *   時段依 signage_meal_slots；結束<=開始自動跨日拆兩段。
+ *   play_date = 檔名日期（跨日段為隔日）；days_of_week = [該日 isoweekday]
+ * 為該廠區所有螢幕各建一筆；同 (screen,playlist,days,start,end) 已存在則跳過或補填 play_date。
+ */
+function isoWeekdayLocal(dateStr: string): number {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  return ((dt.getDay() + 6) % 7) + 1; // 1=Mon ... 7=Sun
+}
+
+function addOneDay(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + 1);
+  const yy = dt.getFullYear();
+  const mm = String(dt.getMonth() + 1).padStart(2, '0');
+  const dd = String(dt.getDate()).padStart(2, '0');
+  return `${yy}-${mm}-${dd}`;
+}
+
+export async function autoGenerateSchedulesFromPlaylists(siteId: number) {
+  try {
+    // 該廠區所有螢幕
+    const screens = await sql`SELECT id FROM signage_screens WHERE site_id = ${siteId};`;
+    const screenIds = (screens as Array<{ id: number }>).map(s => s.id);
+    if (screenIds.length === 0) {
+      return { success: false, error: '此廠區尚無螢幕，請先建立螢幕' };
+    }
+
+    // 該廠區的餐期設定 → 建立「啟用餐期 → 時段」對照
+    const slotsResult = await getMealSlots(siteId);
+    if (!slotsResult.success || !slotsResult.data) {
+      return { success: false, error: '無法讀取餐期設定' };
+    }
+    const slotSegments = new Map<string, { start: string; end: string; nextDay?: boolean }[]>();
+    for (const s of slotsResult.data) {
+      if (s.enabled) slotSegments.set(s.meal_key, buildSegments(s.start_time, s.end_time));
+    }
+
+    // 該廠區所有播放清單內的素材檔名
+    const rows = await sql`
+      SELECT pi.playlist_id, a.filename
+      FROM signage_playlist_items pi
+      JOIN signage_assets a ON pi.asset_id = a.id
+      JOIN signage_playlists p ON pi.playlist_id = p.id
+      WHERE p.site_id = ${siteId};
+    `;
+
+    // 該廠區既有排程（用於去重/補填）
+    const existingRows = await sql`
+      SELECT s.id, s.screen_id, s.playlist_id, s.start_time, s.end_time, s.days_of_week, s.play_date
+      FROM signage_schedules s
+      JOIN signage_screens sc ON s.screen_id = sc.id
+      WHERE sc.site_id = ${siteId};
+    `;
+    const norm = (t: unknown) => String(t).substring(0, 8); // "HH:MM:SS"
+    const existingMap = new Map<string, { id: number; play_date: string | null }>();
+    for (const e of existingRows as Array<{ id: number; screen_id: number; playlist_id: number; start_time: string; end_time: string; days_of_week: string; play_date: string | null }>) {
+      const key = `${e.screen_id}|${e.playlist_id}|${e.days_of_week}|${norm(e.start_time)}|${norm(e.end_time)}`;
+      existingMap.set(key, { id: e.id, play_date: e.play_date ? String(e.play_date).substring(0, 10) : null });
+    }
+
+    const pattern = /_([BLDN])_(\d{4}-\d{2}-\d{2})\.html$/i;
+    let created = 0, updated = 0, skipped = 0;
+    const inserts: { screen_id: number; playlist_id: number; start: string; end: string; days: string; play_date: string }[] = [];
+    const updates: { id: number; play_date: string }[] = [];
+
+    for (const row of rows as Array<{ playlist_id: number; filename: string }>) {
+      const match = row.filename.match(pattern);
+      if (!match) continue;
+      const slot = match[1].toUpperCase();
+      const baseDate = match[2];
+      const segments = slotSegments.get(slot); // 只處理已啟用的餐期
+      if (!segments) continue;
+
+      for (const seg of segments) {
+        const playDate = seg.nextDay ? addOneDay(baseDate) : baseDate;
+        const daysJson = JSON.stringify([isoWeekdayLocal(playDate)]);
+        for (const screenId of screenIds) {
+          const key = `${screenId}|${row.playlist_id}|${daysJson}|${seg.start}|${seg.end}`;
+          const existing = existingMap.get(key);
+          if (existing) {
+            if (existing.play_date === null) {
+              updates.push({ id: existing.id, play_date: playDate });
+              existing.play_date = playDate;
+              updated++;
+            } else if (existing.play_date === playDate) {
+              skipped++;
+            } else {
+              inserts.push({ screen_id: screenId, playlist_id: row.playlist_id, start: seg.start, end: seg.end, days: daysJson, play_date: playDate });
+              created++;
+            }
+          } else {
+            inserts.push({ screen_id: screenId, playlist_id: row.playlist_id, start: seg.start, end: seg.end, days: daysJson, play_date: playDate });
+            existingMap.set(key, { id: -1, play_date: playDate });
+            created++;
+          }
+        }
+      }
+    }
+
+    // 寫入
+    for (const u of updates) {
+      await sql`UPDATE signage_schedules SET play_date = ${u.play_date}, updated_at = CURRENT_TIMESTAMP WHERE id = ${u.id};`;
+    }
+    for (const ins of inserts) {
+      await sql`
+        INSERT INTO signage_schedules (screen_id, playlist_id, start_time, end_time, days_of_week, play_date)
+        VALUES (${ins.screen_id}, ${ins.playlist_id}, ${ins.start}, ${ins.end}, ${ins.days}, ${ins.play_date});
+      `;
+    }
+
+    return { success: true, data: { created, updated, skipped } };
+  } catch (error) {
+    console.error('一鍵列表轉排程時發生錯誤：', error);
     return { success: false, error };
   }
 }

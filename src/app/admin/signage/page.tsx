@@ -3,44 +3,42 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
-interface Counts {
-  regions: number;
-  sites: number;
-  screens: number;
-  assets: number;
-  playlists: number;
-  schedules: number;
+interface Region {
+  id: number;
+  name: string;
+}
+
+interface Site {
+  id: number;
+  region_id: number;
+  region_name: string | null;
+  name: string;
+  code: string;
+  description: string | null;
 }
 
 export default function SignageOverviewPage() {
-  const [counts, setCounts] = useState<Counts | null>(null);
-  const [initStatus, setInitStatus] = useState<string>('');
+  const [regions, setRegions] = useState<Region[]>([]);
+  const [sites, setSites] = useState<Site[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [initStatus, setInitStatus] = useState('');
   const [isInit, setIsInit] = useState(false);
 
-  const loadCounts = async () => {
+  const load = async () => {
+    setLoading(true);
     try {
-      const [r, s, sc, a, p, sch] = await Promise.all([
+      const [r, s] = await Promise.all([
         fetch('/api/signage/regions').then(r => r.json()),
         fetch('/api/signage/sites').then(r => r.json()),
-        fetch('/api/signage/screens').then(r => r.json()),
-        fetch('/api/signage/assets').then(r => r.json()),
-        fetch('/api/signage/playlists').then(r => r.json()),
-        fetch('/api/signage/schedules').then(r => r.json()),
       ]);
-      setCounts({
-        regions: r.data?.length ?? 0,
-        sites: s.data?.length ?? 0,
-        screens: sc.data?.length ?? 0,
-        assets: a.data?.length ?? 0,
-        playlists: p.data?.length ?? 0,
-        schedules: sch.data?.length ?? 0,
-      });
-    } catch {
-      setCounts(null);
+      if (r.success) setRegions(r.data || []);
+      if (s.success) setSites(s.data || []);
+    } finally {
+      setLoading(false);
     }
   };
 
-  useEffect(() => { loadCounts(); }, []);
+  useEffect(() => { load(); }, []);
 
   const handleInit = async () => {
     setIsInit(true);
@@ -49,68 +47,96 @@ export default function SignageOverviewPage() {
       const res = await fetch('/api/signage/init', { method: 'POST' });
       const json = await res.json();
       setInitStatus(json.success ? '✅ 資料表已建立' : `❌ ${json.message}`);
-      if (json.success) await loadCounts();
+      if (json.success) await load();
     } catch {
       setInitStatus('❌ 網路錯誤');
     }
     setIsInit(false);
   };
 
-  const stats = [
-    { label: '區域', href: '/admin/signage/regions', value: counts?.regions ?? '—' },
-    { label: '廠區', href: '/admin/signage/sites', value: counts?.sites ?? '—' },
-    { label: '螢幕', href: '/admin/signage/screens', value: counts?.screens ?? '—' },
-    { label: '素材', href: '/admin/signage/assets', value: counts?.assets ?? '—' },
-    { label: '播放清單', href: '/admin/signage/playlists', value: counts?.playlists ?? '—' },
-    { label: '排程', href: '/admin/signage/schedules', value: counts?.schedules ?? '—' },
-  ];
+  // 依區域分組廠區
+  const grouped = regions.map(r => ({
+    region: r,
+    sites: sites.filter(s => s.region_id === r.id),
+  }));
+  const orphanSites = sites.filter(s => !regions.some(r => r.id === s.region_id));
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">電子看版總覽</h1>
-        <p className="text-gray-500 mt-1">管理區域、廠區、螢幕、素材、播放清單與排程</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">電子看版 — 廠區總覽</h1>
+          <p className="text-gray-500 mt-1">選擇一個廠區進入管理（螢幕 / 素材 / 播放清單 / 排程）</p>
+        </div>
+        <div className="flex gap-2">
+          <Link href="/admin/signage/regions" className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium">
+            區域管理
+          </Link>
+          <Link href="/admin/signage/sites" className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium">
+            廠區管理
+          </Link>
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        {stats.map(s => (
-          <Link
-            key={s.label}
-            href={s.href}
-            className="bg-white border border-gray-200 rounded-lg p-5 hover:shadow-md transition-shadow"
-          >
-            <div className="text-sm text-gray-500">{s.label}</div>
-            <div className="text-2xl font-bold text-cyan-600 mt-2">{s.value}</div>
-          </Link>
-        ))}
-      </div>
+      {loading ? (
+        <p className="text-gray-400">載入中...</p>
+      ) : sites.length === 0 ? (
+        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg text-sm">
+          尚無廠區。請先到「區域管理」建立區域，再到「廠區管理」建立廠區。
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {grouped.map(({ region, sites: rSites }) => rSites.length > 0 && (
+            <div key={region.id}>
+              <h2 className="text-sm font-semibold text-gray-500 mb-2">{region.name}</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {rSites.map(site => (
+                  <Link
+                    key={site.id}
+                    href={`/admin/signage/site/${site.id}/playlists`}
+                    className="bg-white border border-gray-200 rounded-lg p-5 hover:shadow-md hover:border-cyan-300 transition-all group"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="min-w-0">
+                        <div className="font-semibold text-gray-900 truncate">{site.name}</div>
+                        <div className="text-xs text-gray-400 font-mono mt-0.5">{site.code}</div>
+                      </div>
+                      <span className="text-cyan-600 text-sm font-medium group-hover:translate-x-0.5 transition-transform">進入管理 →</span>
+                    </div>
+                    {site.description && <div className="text-sm text-gray-500 mt-2">{site.description}</div>}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          ))}
+
+          {orphanSites.length > 0 && (
+            <div>
+              <h2 className="text-sm font-semibold text-gray-500 mb-2">未分類</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {orphanSites.map(site => (
+                  <Link key={site.id} href={`/admin/signage/site/${site.id}/playlists`}
+                    className="bg-white border border-gray-200 rounded-lg p-5 hover:shadow-md hover:border-cyan-300 transition-all">
+                    <div className="font-semibold text-gray-900">{site.name}</div>
+                    <div className="text-xs text-gray-400 font-mono">{site.code}</div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="bg-white border border-gray-200 rounded-lg p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-3">資料庫初始化</h2>
         <p className="text-sm text-gray-600 mb-4">
-          第一次使用本系統時，請按下「初始化資料表」建立 7 張看版相關資料表（regions、sites、screens、assets、playlists、playlist_items、schedules）。已存在的資料表不會被覆蓋。
+          第一次使用本系統時，按下「初始化資料表」建立 7 張看版相關資料表。已存在的資料表不會被覆蓋。
         </p>
-        <button
-          onClick={handleInit}
-          disabled={isInit}
-          className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium"
-        >
+        <button onClick={handleInit} disabled={isInit}
+          className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium">
           {isInit ? '初始化中...' : '🛠️ 初始化資料表'}
         </button>
         {initStatus && <p className="mt-3 text-sm">{initStatus}</p>}
-      </div>
-
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-        <h2 className="text-lg font-semibold text-blue-900 mb-2">📋 操作流程</h2>
-        <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
-          <li>建立 <Link className="underline" href="/admin/signage/regions">區域</Link>（例：北部、中部）</li>
-          <li>在區域下建立 <Link className="underline" href="/admin/signage/sites">廠區</Link>（需指定英數代號用於分類素材）</li>
-          <li>為廠區註冊 <Link className="underline" href="/admin/signage/screens">螢幕</Link>（系統自動產生唯一 key）</li>
-          <li>上傳 .html <Link className="underline" href="/admin/signage/assets">素材</Link>（支援批次上傳）</li>
-          <li>建立 <Link className="underline" href="/admin/signage/playlists">播放清單</Link>（將素材依序加入並設定時長）</li>
-          <li>設定 <Link className="underline" href="/admin/signage/schedules">排程</Link>（指定螢幕、播放清單、時段、星期）</li>
-          <li>在螢幕設備上開啟 <code className="bg-blue-100 px-1 rounded">/signage/player/[螢幕 key]</code> 並全螢幕播放</li>
-        </ol>
       </div>
     </div>
   );
