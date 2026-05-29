@@ -684,6 +684,57 @@ export async function replacePlaylistItems(
   }
 }
 
+/**
+ * 將同一組素材附加（append）到多個既有播放清單的尾端。
+ * 新項目的 order 接續每個清單目前最大的 order 之後，不會動到既有項目。
+ */
+export async function batchAppendItemsToPlaylists(
+  playlistIds: number[],
+  items: { asset_id: number; duration_seconds: number }[],
+) {
+  try {
+    if (playlistIds.length === 0 || items.length === 0) {
+      return { success: false, error: '未提供清單或素材' };
+    }
+    const existing = await sql`
+      SELECT id FROM signage_playlists WHERE id = ANY(${playlistIds});
+    `;
+    const validIds = new Set((existing as { id: number }[]).map(r => r.id));
+    const targetIds = playlistIds.filter(id => validIds.has(id));
+    if (targetIds.length === 0) {
+      return { success: false, error: '找不到任何指定的播放清單' };
+    }
+
+    let totalInserted = 0;
+    for (const pid of targetIds) {
+      const maxRow = await sql`
+        SELECT COALESCE(MAX("order"), -1) AS max_order
+        FROM signage_playlist_items WHERE playlist_id = ${pid};
+      `;
+      let nextOrder = Number((maxRow[0] as { max_order: number }).max_order) + 1;
+      for (const item of items) {
+        await sql`
+          INSERT INTO signage_playlist_items (playlist_id, asset_id, duration_seconds, "order")
+          VALUES (${pid}, ${item.asset_id}, ${item.duration_seconds}, ${nextOrder});
+        `;
+        nextOrder += 1;
+        totalInserted += 1;
+      }
+    }
+    return {
+      success: true,
+      data: {
+        playlist_count: targetIds.length,
+        item_count: items.length,
+        inserted: totalInserted,
+      },
+    };
+  } catch (error) {
+    console.error('批次附加播放項目時發生錯誤：', error);
+    return { success: false, error };
+  }
+}
+
 // ==================== 餐期時段設定（每廠區） ====================
 
 export interface MealSlot {

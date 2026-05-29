@@ -46,6 +46,14 @@ export default function SitePlaylistsPage() {
   const [availableAssets, setAvailableAssets] = useState<Asset[]>([]);
   const [itemSaveMsg, setItemSaveMsg] = useState('');
 
+  // 批次加入素材對話框
+  const [batchAddOpen, setBatchAddOpen] = useState(false);
+  const [batchAssets, setBatchAssets] = useState<Asset[]>([]);
+  const [batchSearch, setBatchSearch] = useState('');
+  const [batchPicked, setBatchPicked] = useState<Array<{ asset_id: number; filename: string; duration_seconds: number }>>([]);
+  const [batchSaveMsg, setBatchSaveMsg] = useState('');
+  const [batchBusy, setBatchBusy] = useState(false);
+
   const load = async () => {
     if (!siteId) return;
     setLoading(true);
@@ -173,6 +181,53 @@ export default function SitePlaylistsPage() {
   };
   const updateDuration = (idx: number, v: number) => setItems(prev => prev.map((it, i) => i === idx ? { ...it, duration_seconds: Math.max(1, v) } : it));
 
+  // ---- 批次加入素材 ----
+  const openBatchAdd = async () => {
+    if (selectedIds.size === 0 || !siteId) return;
+    setBatchAddOpen(true);
+    setBatchSearch('');
+    setBatchPicked([]);
+    setBatchSaveMsg('');
+    const res = await fetch(`/api/signage/assets?site_id=${siteId}`).then(r => r.json());
+    if (res.success) setBatchAssets(res.data || []);
+  };
+
+  const batchPick = (a: Asset) => {
+    setBatchPicked(prev => [...prev, { asset_id: a.id, filename: a.filename, duration_seconds: DEFAULT_DURATION }]);
+  };
+  const batchUnpick = (idx: number) => setBatchPicked(prev => prev.filter((_, i) => i !== idx));
+  const batchUpdateDuration = (idx: number, v: number) =>
+    setBatchPicked(prev => prev.map((it, i) => i === idx ? { ...it, duration_seconds: Math.max(1, v) } : it));
+
+  const submitBatchAdd = async () => {
+    if (selectedIds.size === 0 || batchPicked.length === 0) return;
+    if (!confirm(`確定將 ${batchPicked.length} 個素材附加到 ${selectedIds.size} 個播放清單尾端？`)) return;
+    setBatchBusy(true);
+    setBatchSaveMsg('儲存中...');
+    try {
+      const res = await fetch('/api/signage/playlists/batch-add-items', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          playlist_ids: Array.from(selectedIds),
+          items: batchPicked.map(it => ({ asset_id: it.asset_id, duration_seconds: it.duration_seconds })),
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setBatchSaveMsg(`✅ ${json.message}`);
+        setActionMsg(json.message);
+        setTimeout(() => { setBatchAddOpen(false); }, 800);
+      } else {
+        setBatchSaveMsg(`❌ ${json.message}`);
+      }
+    } catch {
+      setBatchSaveMsg('❌ 網路錯誤');
+    } finally {
+      setBatchBusy(false);
+    }
+  };
+
   const saveItems = async () => {
     if (!itemsEditing) return;
     setItemSaveMsg('儲存中...');
@@ -201,6 +256,10 @@ export default function SitePlaylistsPage() {
         </button>
         <button onClick={allSelected ? deselectAll : selectAll} className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-medium">
           {allSelected ? '取消全選' : '全選'}
+        </button>
+        <button onClick={openBatchAdd} disabled={selectedIds.size === 0 || busy}
+          className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white px-4 py-2 rounded-lg text-sm font-medium">
+          批次加入素材 ({selectedIds.size})
         </button>
         <button onClick={handleBatchDelete} disabled={selectedIds.size === 0 || busy}
           className="bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white px-4 py-2 rounded-lg text-sm font-medium">
@@ -308,6 +367,107 @@ export default function SitePlaylistsPage() {
               <div className="flex gap-2">
                 <button onClick={() => setItemsEditing(null)} className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium">關閉</button>
                 <button onClick={saveItems} className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg text-sm font-medium">儲存項目</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 批次加入素材對話框 */}
+      {batchAddOpen && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] p-4" onClick={() => !batchBusy && setBatchAddOpen(false)}>
+          <div className="bg-white rounded-xl max-w-5xl w-full max-h-[88vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-6 border-b">
+              <div>
+                <h2 className="text-xl font-semibold">批次加入素材</h2>
+                <p className="text-sm text-gray-500 mt-1">將所選素材附加到 <strong>{selectedIds.size}</strong> 個播放清單的尾端（不會覆蓋既有項目）</p>
+              </div>
+              <button onClick={() => !batchBusy && setBatchAddOpen(false)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-6 overflow-y-auto flex-1">
+              {/* 左：素材選擇器 */}
+              <div className="flex flex-col min-h-0">
+                <input
+                  type="text"
+                  value={batchSearch}
+                  onChange={e => setBatchSearch(e.target.value)}
+                  placeholder="搜尋素材檔名..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-3"
+                />
+                <div className="border border-gray-200 rounded-lg overflow-y-auto flex-1 divide-y">
+                  {batchAssets
+                    .filter(a => a.filename.toLowerCase().includes(batchSearch.toLowerCase()))
+                    .map(a => {
+                      const isVideo = /\.(mp4|webm|mov|m4v)$/i.test(a.filename);
+                      return (
+                        <button
+                          key={a.id}
+                          type="button"
+                          onClick={() => batchPick(a)}
+                          className="w-full flex items-center gap-3 p-2 hover:bg-indigo-50 text-left"
+                        >
+                          <div className="w-16 h-12 bg-gray-100 rounded flex items-center justify-center overflow-hidden flex-shrink-0">
+                            {isVideo ? (
+                              <span className="text-2xl">🎬</span>
+                            ) : (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={a.blob_url} alt={a.filename} className="w-full h-full object-cover" />
+                            )}
+                          </div>
+                          <span className="flex-1 text-sm truncate font-mono">{a.filename}</span>
+                          <span className="text-indigo-600 text-sm">＋</span>
+                        </button>
+                      );
+                    })}
+                  {batchAssets.length === 0 && (
+                    <p className="text-gray-400 text-sm text-center py-8">尚無素材</p>
+                  )}
+                </div>
+              </div>
+
+              {/* 右：已選素材與秒數 */}
+              <div className="flex flex-col min-h-0">
+                <div className="text-sm text-gray-600 mb-3">
+                  已選 <strong>{batchPicked.length}</strong> 個素材（每個皆會以下方秒數加入）
+                </div>
+                <div className="border border-gray-200 rounded-lg overflow-y-auto flex-1 divide-y">
+                  {batchPicked.length === 0 ? (
+                    <p className="text-gray-400 text-sm text-center py-8">尚未選擇素材，從左側點擊加入</p>
+                  ) : (
+                    batchPicked.map((it, idx) => (
+                      <div key={`${it.asset_id}-${idx}`} className="flex items-center gap-2 p-2">
+                        <span className="text-gray-400 w-6 text-sm">{idx + 1}</span>
+                        <span className="flex-1 font-mono text-sm truncate">{it.filename}</span>
+                        <input
+                          type="number"
+                          min={1}
+                          value={it.duration_seconds}
+                          onChange={e => batchUpdateDuration(idx, Number(e.target.value))}
+                          className="w-20 px-2 py-1 border border-gray-300 rounded text-right text-sm"
+                        />
+                        <span className="text-gray-500 text-sm">秒</span>
+                        <button onClick={() => batchUnpick(idx)} className="text-red-500 hover:text-red-700 px-2">✕</button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between border-t p-6">
+              <span className="text-sm text-gray-600">{batchSaveMsg}</span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setBatchAddOpen(false)}
+                  disabled={batchBusy}
+                  className="bg-gray-200 hover:bg-gray-300 disabled:opacity-50 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium"
+                >取消</button>
+                <button
+                  onClick={submitBatchAdd}
+                  disabled={batchBusy || batchPicked.length === 0}
+                  className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white px-4 py-2 rounded-lg text-sm font-medium"
+                >確定加入</button>
               </div>
             </div>
           </div>

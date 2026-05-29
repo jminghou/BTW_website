@@ -11,6 +11,13 @@ interface Asset {
   upload_timestamp: string;
 }
 
+interface TemplateMeta {
+  key: string;
+  displayName: string;
+  customer: string;
+  description: string;
+}
+
 export default function SiteAssetsPage() {
   const params = useParams<{ siteId: string }>();
   const siteId = params?.siteId;
@@ -26,6 +33,10 @@ export default function SiteAssetsPage() {
   const [uploadDetail, setUploadDetail] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // JSON 轉檔版型清單
+  const [availableTemplates, setAvailableTemplates] = useState<TemplateMeta[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState<string>('');
+
   const load = async () => {
     if (!siteId) return;
     setLoading(true);
@@ -40,6 +51,22 @@ export default function SiteAssetsPage() {
   };
 
   useEffect(() => { load(); }, [siteId]);
+
+  // 載入可用版型（一次即可）
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/signage/templates');
+        const json = await res.json();
+        if (json.success) {
+          setAvailableTemplates(json.data || []);
+          setSelectedTemplate(json.default || (json.data?.[0]?.key ?? ''));
+        }
+      } catch {
+        // 取不到就維持空陣列；JSON 分頁會顯示提示
+      }
+    })();
+  }, []);
 
   const switchMode = (mode: 'html' | 'json') => {
     setUploadMode(mode);
@@ -61,6 +88,7 @@ export default function SiteAssetsPage() {
 
       let res: Response;
       if (uploadMode === 'json') {
+        if (selectedTemplate) fd.append('template', selectedTemplate);
         res = await fetch('/api/signage/assets/convert', { method: 'POST', body: fd });
       } else {
         if (uploadDesc) fd.append('description', uploadDesc);
@@ -152,6 +180,34 @@ export default function SiteAssetsPage() {
           {uploadMode === 'json' && (
             <div className="bg-blue-50 border border-blue-200 text-blue-800 text-sm rounded-lg px-4 py-3">
               上傳餐點資料 JSON，系統會自動依「據點＋時段＋日期」轉成菜單 HTML；一個 JSON 含多天會自動拆成多個菜單。
+            </div>
+          )}
+          {uploadMode === 'json' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">選擇版型 *</label>
+              {availableTemplates.length === 0 ? (
+                <p className="text-sm text-gray-400">尚無可用版型</p>
+              ) : (
+                <>
+                  <select
+                    value={selectedTemplate}
+                    onChange={e => setSelectedTemplate(e.target.value)}
+                    className="w-full md:w-1/2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500"
+                  >
+                    {availableTemplates.map(t => (
+                      <option key={t.key} value={t.key}>
+                        {t.displayName}（{t.customer}）
+                      </option>
+                    ))}
+                  </select>
+                  {(() => {
+                    const t = availableTemplates.find(x => x.key === selectedTemplate);
+                    return t?.description ? (
+                      <p className="text-xs text-gray-500 mt-1">{t.description}</p>
+                    ) : null;
+                  })()}
+                </>
+              )}
             </div>
           )}
           <div>
