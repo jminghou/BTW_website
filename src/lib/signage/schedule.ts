@@ -22,33 +22,78 @@ export interface ScheduleRow {
 }
 
 /**
- * 取得「現在」對應 v2.0 的週幾（週一 = 1, 週日 = 7）
+ * 看版系統的時區固定為台灣（UTC+8）。
+ * 正式環境（Vercel）伺服器時區是 UTC，若直接用 now.getHours() 等本機方法，
+ * 會比台灣時間少 8 小時，導致排程時間視窗永遠對不上 → 螢幕一直待機中。
+ * 因此所有「現在」的計算都改用 Intl 以 Asia/Taipei 取台灣牆上時間。
+ */
+const SIGNAGE_TIMEZONE = 'Asia/Taipei';
+
+/**
+ * 取得「現在」在台灣時區的牆上時間各欄位
+ */
+function getTaipeiParts(now: Date): {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+} {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: SIGNAGE_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).formatToParts(now);
+
+  const get = (type: string) => Number(parts.find(p => p.type === type)?.value ?? '0');
+  let hour = get('hour');
+  if (hour === 24) hour = 0; // Intl 在午夜可能回傳 24
+  return {
+    year: get('year'),
+    month: get('month'),
+    day: get('day'),
+    hour,
+    minute: get('minute'),
+    second: get('second'),
+  };
+}
+
+/**
+ * 取得「現在」對應 v2.0 的週幾（週一 = 1, 週日 = 7），以台灣時區計算
  * Python: weekday() 回傳 0=Mon ~ 6=Sun，加 1 後 1=Mon ~ 7=Sun
- * JS: getDay() 回傳 0=Sun ~ 6=Sat，需轉換
  */
 export function getCurrentDayOfWeek(now: Date = new Date()): number {
-  const jsDay = now.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+  const { year, month, day } = getTaipeiParts(now);
+  // 用該台灣日期的 UTC 午夜算星期幾，避免再被本機時區干擾
+  const jsDay = new Date(Date.UTC(year, month - 1, day)).getUTCDay(); // 0=Sun ~ 6=Sat
   return jsDay === 0 ? 7 : jsDay;
 }
 
 /**
- * 取得「現在」的本地時間字串 "HH:MM:SS"
+ * 取得「現在」的台灣時間字串 "HH:MM:SS"
  */
 export function getCurrentTimeString(now: Date = new Date()): string {
-  const h = String(now.getHours()).padStart(2, '0');
-  const m = String(now.getMinutes()).padStart(2, '0');
-  const s = String(now.getSeconds()).padStart(2, '0');
+  const { hour, minute, second } = getTaipeiParts(now);
+  const h = String(hour).padStart(2, '0');
+  const m = String(minute).padStart(2, '0');
+  const s = String(second).padStart(2, '0');
   return `${h}:${m}:${s}`;
 }
 
 /**
- * 取得「現在」的本地日期字串 "YYYY-MM-DD"
+ * 取得「現在」的台灣日期字串 "YYYY-MM-DD"
  */
 export function getCurrentDateString(now: Date = new Date()): string {
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  const d = String(now.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+  const { year, month, day } = getTaipeiParts(now);
+  const m = String(month).padStart(2, '0');
+  const d = String(day).padStart(2, '0');
+  return `${year}-${m}-${d}`;
 }
 
 /**
