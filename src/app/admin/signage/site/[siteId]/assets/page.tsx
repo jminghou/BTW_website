@@ -25,6 +25,8 @@ export default function SiteAssetsPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  // 記住上一次點選的列索引，作為 Shift 範圍選取的錨點
+  const lastIndexRef = useRef<number | null>(null);
 
   const [uploadMode, setUploadMode] = useState<'html' | 'json'>('html');
   const [uploadDesc, setUploadDesc] = useState('');
@@ -45,6 +47,7 @@ export default function SiteAssetsPage() {
       const json = await res.json();
       if (json.success) setAssets(json.data || []);
       setSelectedIds(new Set());
+      lastIndexRef.current = null;
     } finally {
       setLoading(false);
     }
@@ -128,6 +131,23 @@ export default function SiteAssetsPage() {
   const toggleSelectAll = () => {
     if (selectedIds.size === assets.length) setSelectedIds(new Set());
     else setSelectedIds(new Set(assets.map(a => a.id)));
+  };
+
+  // 點檔名／核取方塊時呼叫；按住 Shift 則從上一個錨點到本列整段一併選取
+  const selectRow = (index: number, id: number, shiftKey: boolean) => {
+    if (shiftKey && lastIndexRef.current !== null) {
+      const start = Math.min(lastIndexRef.current, index);
+      const end = Math.max(lastIndexRef.current, index);
+      const rangeIds = assets.slice(start, end + 1).map(a => a.id);
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        rangeIds.forEach(rid => next.add(rid));
+        return next;
+      });
+    } else {
+      toggleSelect(id);
+      lastIndexRef.current = index;
+    }
   };
 
   const handleBatchDelete = async () => {
@@ -262,10 +282,14 @@ export default function SiteAssetsPage() {
               <tr><td colSpan={5} className="px-3 py-8 text-center text-gray-400">載入中...</td></tr>
             ) : assets.length === 0 ? (
               <tr><td colSpan={5} className="px-3 py-8 text-center text-gray-400">尚無素材</td></tr>
-            ) : assets.map(a => (
-              <tr key={a.id} className="border-b border-gray-100 hover:bg-gray-50">
-                <td className="px-3 py-3"><input type="checkbox" checked={selectedIds.has(a.id)} onChange={() => toggleSelect(a.id)} /></td>
-                <td className="px-3 py-3 font-mono text-cyan-700">{a.filename}</td>
+            ) : assets.map((a, idx) => (
+              <tr key={a.id} className={`border-b border-gray-100 hover:bg-gray-50 ${selectedIds.has(a.id) ? 'bg-cyan-50' : ''}`}>
+                <td className="px-3 py-3">
+                  <input type="checkbox" checked={selectedIds.has(a.id)} onChange={() => {}}
+                    onClick={e => selectRow(idx, a.id, e.shiftKey)} />
+                </td>
+                <td className="px-3 py-3 font-mono text-cyan-700 cursor-pointer select-none"
+                  onClick={e => selectRow(idx, a.id, e.shiftKey)}>{a.filename}</td>
                 <td className="px-3 py-3 text-gray-600">{a.description || '—'}</td>
                 <td className="px-3 py-3 text-xs text-gray-400">{new Date(a.upload_timestamp).toLocaleString('zh-TW')}</td>
                 <td className="px-3 py-3 text-right">

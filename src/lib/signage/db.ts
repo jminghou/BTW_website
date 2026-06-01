@@ -7,7 +7,13 @@ import { randomUUID } from 'crypto';
  * 共用官網的 users 表做登入，不另建帳號表
  */
 
-const sql = neon(process.env.DATABASE_URL!);
+// fetchOptions.cache = 'no-store'：關閉 Next.js 對「資料庫查詢」的 fetch 快取。
+// 否則 GET Route Handler 內的 DB 讀取會被框架快取且不自動失效，造成後台清單
+// 被凍結在舊快照（曾出現：播放清單只剩 20 筆、排程列表顯示 0 筆、播放器讀到舊內容）。
+// 這是讓所有 signage 查詢都即時反映資料庫的單點修正。
+const sql = neon(process.env.DATABASE_URL!, {
+  fetchOptions: { cache: 'no-store' },
+});
 
 // ==================== 初始化 ====================
 

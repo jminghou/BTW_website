@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 
 interface Playlist {
@@ -32,6 +32,8 @@ export default function SitePlaylistsPage() {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  // 記住上一次點選的列索引，作為 Shift 範圍選取的錨點
+  const lastIndexRef = useRef<number | null>(null);
   const [actionMsg, setActionMsg] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -68,6 +70,7 @@ export default function SitePlaylistsPage() {
       const json = await res.json();
       if (json.success) setPlaylists(json.data || []);
       setSelectedIds(new Set());
+      lastIndexRef.current = null;
     } finally {
       setLoading(false);
     }
@@ -107,6 +110,23 @@ export default function SitePlaylistsPage() {
   };
   const selectAll = () => setSelectedIds(new Set(playlists.map(p => p.id)));
   const deselectAll = () => setSelectedIds(new Set());
+
+  // 點名稱／核取方塊時呼叫；按住 Shift 則從上一個錨點到本列整段一併選取
+  const selectRow = (index: number, id: number, shiftKey: boolean) => {
+    if (shiftKey && lastIndexRef.current !== null) {
+      const start = Math.min(lastIndexRef.current, index);
+      const end = Math.max(lastIndexRef.current, index);
+      const rangeIds = playlists.slice(start, end + 1).map(p => p.id);
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        rangeIds.forEach(rid => next.add(rid));
+        return next;
+      });
+    } else {
+      toggleSelect(id);
+      lastIndexRef.current = index;
+    }
+  };
 
   const handleBatchDelete = async () => {
     if (selectedIds.size === 0) return;
@@ -358,10 +378,14 @@ export default function SitePlaylistsPage() {
               <tr><td colSpan={4} className="px-4 py-8 text-center text-gray-400">載入中...</td></tr>
             ) : playlists.length === 0 ? (
               <tr><td colSpan={4} className="px-4 py-8 text-center text-gray-400">尚無播放清單</td></tr>
-            ) : playlists.map(p => (
-              <tr key={p.id} className="border-b border-gray-100 hover:bg-gray-50">
-                <td className="px-3 py-3"><input type="checkbox" checked={selectedIds.has(p.id)} onChange={() => toggleSelect(p.id)} /></td>
-                <td className="px-4 py-3 font-medium">{p.name}</td>
+            ) : playlists.map((p, idx) => (
+              <tr key={p.id} className={`border-b border-gray-100 hover:bg-gray-50 ${selectedIds.has(p.id) ? 'bg-cyan-50' : ''}`}>
+                <td className="px-3 py-3">
+                  <input type="checkbox" checked={selectedIds.has(p.id)} onChange={() => {}}
+                    onClick={e => selectRow(idx, p.id, e.shiftKey)} />
+                </td>
+                <td className="px-4 py-3 font-medium cursor-pointer select-none"
+                  onClick={e => selectRow(idx, p.id, e.shiftKey)}>{p.name}</td>
                 <td className="px-4 py-3 text-gray-600">{p.description || '—'}</td>
                 <td className="px-4 py-3 text-right whitespace-nowrap">
                   <button onClick={() => openItemsEditor(p)} className="text-cyan-600 hover:underline mr-3">編輯內容</button>
