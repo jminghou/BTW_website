@@ -735,6 +735,45 @@ export async function batchAppendItemsToPlaylists(
   }
 }
 
+/**
+ * 批次統一修改多個播放清單內「所有項目」的播放秒數。
+ * 一次更新所選清單的全部 items，回傳實際異動的清單數與項目筆數。
+ */
+export async function batchSetPlaylistItemsDuration(
+  playlistIds: number[],
+  durationSeconds: number,
+) {
+  try {
+    if (playlistIds.length === 0) {
+      return { success: false, error: '未提供要更新的播放清單' };
+    }
+    if (!Number.isFinite(durationSeconds) || durationSeconds < 1) {
+      return { success: false, error: '播放秒數必須是大於 0 的數字' };
+    }
+    const dur = Math.floor(durationSeconds);
+    const updated = await sql`
+      UPDATE signage_playlist_items
+      SET duration_seconds = ${dur}
+      WHERE playlist_id = ANY(${playlistIds})
+      RETURNING id, playlist_id;
+    `;
+    const affectedPlaylists = new Set(
+      (updated as Array<{ playlist_id: number }>).map(r => r.playlist_id),
+    );
+    return {
+      success: true,
+      data: {
+        playlist_count: affectedPlaylists.size,
+        item_count: updated.length,
+        duration_seconds: dur,
+      },
+    };
+  } catch (error) {
+    console.error('批次修改播放秒數時發生錯誤：', error);
+    return { success: false, error };
+  }
+}
+
 // ==================== 餐期時段設定（每廠區） ====================
 
 export interface MealSlot {

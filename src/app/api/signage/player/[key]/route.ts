@@ -7,6 +7,22 @@ import {
 import { matchSchedule, type ScheduleRow } from '@/lib/signage/schedule';
 
 /**
+ * 強制每次請求都即時查資料庫，不走 Next.js 的 Data Cache。
+ *
+ * 為什麼必要：
+ *   GET Route Handler 內的 DB 讀取預設會被 Next.js 快取，且不會自動失效。
+ *   曾發生「播放清單已改成 2 個項目，但播放器一直讀到 playlist 建立當下的
+ *   舊狀態（1 個項目、180 秒）」→ 螢幕只播第一頁。
+ *   標記 force-dynamic + revalidate=0 可關閉框架層快取，確保排程/清單即時生效。
+ *
+ *   注意：下方仍對「回應本身」設 Cache-Control s-maxage=60，
+ *   那是 CDN 邊緣快取（最多延遲 60 秒，刻意保留以減少 Neon 連線），
+ *   與這裡關閉的「資料讀取快取」是不同層級，兩者並存沒有衝突。
+ */
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+/**
  * 播放器核心 API
  * GET /api/signage/player/[key]
  *

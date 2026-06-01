@@ -54,6 +54,12 @@ export default function SitePlaylistsPage() {
   const [batchSaveMsg, setBatchSaveMsg] = useState('');
   const [batchBusy, setBatchBusy] = useState(false);
 
+  // 批次修改秒數對話框
+  const [durationOpen, setDurationOpen] = useState(false);
+  const [durationValue, setDurationValue] = useState(DEFAULT_DURATION);
+  const [durationMsg, setDurationMsg] = useState('');
+  const [durationBusy, setDurationBusy] = useState(false);
+
   const load = async () => {
     if (!siteId) return;
     setLoading(true);
@@ -228,6 +234,47 @@ export default function SitePlaylistsPage() {
     }
   };
 
+  // ---- 批次修改秒數 ----
+  const openDurationEditor = () => {
+    if (selectedIds.size === 0) return;
+    setDurationValue(DEFAULT_DURATION);
+    setDurationMsg('');
+    setDurationOpen(true);
+  };
+
+  const submitDuration = async () => {
+    if (selectedIds.size === 0) return;
+    if (!Number.isFinite(durationValue) || durationValue < 1) {
+      setDurationMsg('❌ 秒數必須是大於 0 的數字');
+      return;
+    }
+    if (!confirm(`確定將所選 ${selectedIds.size} 個播放清單內所有項目的秒數，統一改為 ${durationValue} 秒？`)) return;
+    setDurationBusy(true);
+    setDurationMsg('儲存中...');
+    try {
+      const res = await fetch('/api/signage/playlists/batch-set-duration', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          playlist_ids: Array.from(selectedIds),
+          duration_seconds: durationValue,
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setDurationMsg(`✅ ${json.message}`);
+        setActionMsg(json.message);
+        setTimeout(() => { setDurationOpen(false); }, 800);
+      } else {
+        setDurationMsg(`❌ ${json.message}`);
+      }
+    } catch {
+      setDurationMsg('❌ 網路錯誤');
+    } finally {
+      setDurationBusy(false);
+    }
+  };
+
   const saveItems = async () => {
     if (!itemsEditing) return;
     setItemSaveMsg('儲存中...');
@@ -260,6 +307,10 @@ export default function SitePlaylistsPage() {
         <button onClick={openBatchAdd} disabled={selectedIds.size === 0 || busy}
           className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white px-4 py-2 rounded-lg text-sm font-medium">
           批次加入素材 ({selectedIds.size})
+        </button>
+        <button onClick={openDurationEditor} disabled={selectedIds.size === 0 || busy}
+          className="bg-amber-600 hover:bg-amber-700 disabled:opacity-40 text-white px-4 py-2 rounded-lg text-sm font-medium">
+          批次修改秒數 ({selectedIds.size})
         </button>
         <button onClick={handleBatchDelete} disabled={selectedIds.size === 0 || busy}
           className="bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white px-4 py-2 rounded-lg text-sm font-medium">
@@ -468,6 +519,47 @@ export default function SitePlaylistsPage() {
                   disabled={batchBusy || batchPicked.length === 0}
                   className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white px-4 py-2 rounded-lg text-sm font-medium"
                 >確定加入</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 批次修改秒數對話框 */}
+      {durationOpen && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] p-4" onClick={() => !durationBusy && setDurationOpen(false)}>
+          <div className="bg-white rounded-xl max-w-md w-full p-6 space-y-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold">批次修改秒數</h2>
+              <button onClick={() => !durationBusy && setDurationOpen(false)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
+            </div>
+            <p className="text-sm text-gray-500">
+              將所選 <strong>{selectedIds.size}</strong> 個播放清單內<strong>所有項目</strong>的播放秒數，統一改為下方數值。
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={1}
+                value={durationValue}
+                onChange={e => setDurationValue(Math.max(1, Number(e.target.value)))}
+                className="w-32 px-3 py-2 border border-gray-300 rounded-lg text-right focus:ring-2 focus:ring-amber-500"
+                autoFocus
+              />
+              <span className="text-gray-500">秒</span>
+            </div>
+            <div className="flex items-center justify-between border-t pt-4">
+              <span className="text-sm text-gray-600">{durationMsg}</span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setDurationOpen(false)}
+                  disabled={durationBusy}
+                  className="bg-gray-200 hover:bg-gray-300 disabled:opacity-50 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium"
+                >取消</button>
+                <button
+                  onClick={submitDuration}
+                  disabled={durationBusy}
+                  className="bg-amber-600 hover:bg-amber-700 disabled:opacity-40 text-white px-4 py-2 rounded-lg text-sm font-medium"
+                >套用</button>
               </div>
             </div>
           </div>
