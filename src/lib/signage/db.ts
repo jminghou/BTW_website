@@ -625,38 +625,95 @@ export async function batchDeletePlaylists(ids: number[]) {
  * 對應 v2.0 admin.py auto-create-from-assets，但 duration 預設 180 秒。
  * 同名清單已存在則跳過。回傳 { created, skipped }。
  */
-export async function autoCreatePlaylistsFromAssets(siteId: number, durationSeconds = 180) {
+/**
+ * 將「指定的素材」各建一個同名播放清單（含 1 個 item）。
+ * 同廠區已有同名清單者略過；本批次內重複檔名只建一個。
+ *
+ * 採批次寫入（用 jsonb 一次插入所有清單、再一次插入所有項目），
+ * 全程僅約 4 次資料庫往返，與素材數量無關 → 不會因逐筆送指令而逾時。
+ */
+export async function createPlaylistsFromAssetIds(assetIds: number[], durationSeconds = 180) {
   try {
-    const assets = await sql`
-      SELECT id, filename FROM signage_assets WHERE site_id = ${siteId} ORDER BY filename ASC;
-    `;
-    const existing = await sql`
-      SELECT name FROM signage_playlists WHERE site_id = ${siteId};
-    `;
-    const existingNames = new Set((existing as Array<{ name: string }>).map(p => p.name));
+    if (!Array.isArray(assetIds) || assetIds.length === 0) {
+      return { success: false, error: '未提供要轉換的素材' };
+    }
+    const dur = Number.isFinite(durationSeconds) && durationSeconds >= 1 ? Math.floor(durationSeconds) : 180;
 
-    let created = 0;
-    let skipped = 0;
-    for (const asset of assets as Array<{ id: number; filename: string }>) {
-      if (existingNames.has(asset.filename)) {
-        skipped++;
-        continue;
-      }
-      const inserted = await sql`
-        INSERT INTO signage_playlists (site_id, name, description)
-        VALUES (${siteId}, ${asset.filename}, ${'自動建立自素材: ' + asset.filename})
-        RETURNING id;
-      `;
-      const playlistId = (inserted[0] as { id: number }).id;
-      await sql`
-        INSERT INTO signage_playlist_items (playlist_id, asset_id, duration_seconds, "order")
-        VALUES (${playlistId}, ${asset.id}, ${durationSeconds}, 0);
-      `;
-      existingNames.add(asset.filename);
-      created++;
+    const assets = (await sql`
+      SELECT id, site_id, filename FROM signage_assets WHERE id = ANY(${assetIds}) ORDER BY filename ASC;
+    `) as Array<{ id: number; site_id: number | null; filename: string }>;
+    if (assets.length === 0) {
+      return { success: false, error: '找不到指定的素材' };
     }
 
-    return { success: true, data: { created, skipped, total: assets.length } };
+    // 這些素材所屬廠區（一般為同一廠區，仍一般化處理）
+    const siteIds = Array.from(new Set(assets.map(a => a.site_id).filter((s): s is number => s != null)));
+    const existing = (await sql`
+      SELECT site_id, name FROM signage_playlists WHERE site_id = ANY(${siteIds});
+    `) as Array<{ site_id: number; name: string }>;
+    const existingKey = new Set(existing.map(e => `${e.site_id}|${e.name}`));
+
+    // 過濾：沒有所屬廠區、已存在同名清單、或本批次內重複者 → 略過
+    const seen = new Set<string>();
+    const toCreate: Array<{ site_id: number; asset_id: number; name: string }> = [];
+    let skipped = 0;
+    for (const a of assets) {
+      if (a.site_id == null) { skipped++; continue; }
+      const key = `${a.site_id}|${a.filename}`;
+      if (existingKey.has(key) || seen.has(key)) { skipped++; continue; }
+      seen.add(key);
+      toCreate.push({ site_id: a.site_id, asset_id: a.id, name: a.filename });
+    }
+
+    if (toCreate.length === 0) {
+      return { success: true, data: { created: 0, skipped, total: assets.length } };
+    }
+
+    // 批次插入播放清單（單次往返），用 jsonb 避免陣列字串轉義問題
+    const playlistRows = toCreate.map(t => ({
+      site_id: t.site_id,
+      name: t.name,
+      desc: '自動建立自素材: ' + t.name,
+    }));
+    const inserted = (await sql`
+      INSERT INTO signage_playlists (site_id, name, description)
+      SELECT (x->>'site_id')::int, x->>'name', x->>'desc'
+      FROM jsonb_array_elements(${JSON.stringify(playlistRows)}::jsonb) AS x
+      RETURNING id, site_id, name;
+    `) as Array<{ id: number; site_id: number; name: string }>;
+
+    const pidByKey = new Map(inserted.map(p => [`${p.site_id}|${p.name}`, p.id]));
+    const itemRows = toCreate
+      .map(t => ({ playlist_id: pidByKey.get(`${t.site_id}|${t.name}`), asset_id: t.asset_id }))
+      .filter((r): r is { playlist_id: number; asset_id: number } => r.playlist_id != null);
+
+    // 批次插入清單項目（單次往返）
+    await sql`
+      INSERT INTO signage_playlist_items (playlist_id, asset_id, duration_seconds, "order")
+      SELECT (x->>'playlist_id')::int, (x->>'asset_id')::int, ${dur}, 0
+      FROM jsonb_array_elements(${JSON.stringify(itemRows)}::jsonb) AS x;
+    `;
+
+    return { success: true, data: { created: inserted.length, skipped, total: assets.length } };
+  } catch (error) {
+    console.error('素材轉列表時發生錯誤：', error);
+    return { success: false, error };
+  }
+}
+
+/**
+ * 一鍵素材轉列表：把該廠區「所有」素材轉成清單。
+ * 改為委派給 createPlaylistsFromAssetIds 的批次寫入版，避免逐筆送指令而逾時。
+ */
+export async function autoCreatePlaylistsFromAssets(siteId: number, durationSeconds = 180) {
+  try {
+    const assets = (await sql`
+      SELECT id FROM signage_assets WHERE site_id = ${siteId} ORDER BY filename ASC;
+    `) as Array<{ id: number }>;
+    if (assets.length === 0) {
+      return { success: true, data: { created: 0, skipped: 0, total: 0 } };
+    }
+    return await createPlaylistsFromAssetIds(assets.map(a => a.id), durationSeconds);
   } catch (error) {
     console.error('一鍵素材轉列表時發生錯誤：', error);
     return { success: false, error };

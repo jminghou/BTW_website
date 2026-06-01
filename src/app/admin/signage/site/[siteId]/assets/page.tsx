@@ -150,6 +150,29 @@ export default function SiteAssetsPage() {
     }
   };
 
+  const [convertingMsg, setConvertingMsg] = useState('');
+  const [converting, setConverting] = useState(false);
+  const handleConvertToPlaylists = async () => {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`確定將選取的 ${selectedIds.size} 個素材各轉成一個播放清單？已存在同名清單會略過。`)) return;
+    setConverting(true);
+    setConvertingMsg('轉換中...');
+    try {
+      const res = await fetch('/api/signage/playlists/create-from-assets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ asset_ids: Array.from(selectedIds) }),
+      });
+      const json = await res.json();
+      setConvertingMsg(json.success ? `✅ ${json.message}` : `❌ ${json.message}`);
+      if (json.success) setSelectedIds(new Set());
+    } catch {
+      setConvertingMsg('❌ 網路錯誤');
+    } finally {
+      setConverting(false);
+    }
+  };
+
   const handleBatchDelete = async () => {
     if (selectedIds.size === 0) return;
     if (!confirm(`確定要刪除選中的 ${selectedIds.size} 個素材嗎？`)) return;
@@ -258,11 +281,18 @@ export default function SiteAssetsPage() {
               {assets.length > 0 && selectedIds.size === assets.length ? '取消全選' : '全選'}
             </button>
             <span className="text-sm text-gray-500">已選 {selectedIds.size} 個</span>
+            {convertingMsg && <span className="text-sm text-gray-600">{convertingMsg}</span>}
           </div>
-          <button onClick={handleBatchDelete} disabled={selectedIds.size === 0}
-            className="bg-red-600 hover:bg-red-700 disabled:opacity-30 text-white px-3 py-1.5 rounded-lg text-sm">
-            刪除選取項目 ({selectedIds.size})
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={handleConvertToPlaylists} disabled={selectedIds.size === 0 || converting}
+              className="bg-green-600 hover:bg-green-700 disabled:opacity-30 text-white px-3 py-1.5 rounded-lg text-sm">
+              素材轉列表 ({selectedIds.size})
+            </button>
+            <button onClick={handleBatchDelete} disabled={selectedIds.size === 0}
+              className="bg-red-600 hover:bg-red-700 disabled:opacity-30 text-white px-3 py-1.5 rounded-lg text-sm">
+              刪除選取項目 ({selectedIds.size})
+            </button>
+          </div>
         </div>
 
         <table className="w-full text-sm">
