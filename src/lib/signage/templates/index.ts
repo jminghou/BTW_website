@@ -1,4 +1,5 @@
 import { convertVis3, type MealItem, type ConvertedMenu } from './vis3';
+import { convertVisTv } from './vis_tv';
 
 /**
  * 版型註冊表（電子看板「上傳 JSON 自動轉檔」用）
@@ -35,10 +36,17 @@ export interface SignageTemplate {
 export const templates: Record<string, SignageTemplate> = {
   vis3: {
     key: 'vis3',
-    displayName: '世界先進版型1',
+    displayName: 'VIS_世界_電腦版',
     customer: '世界先進',
     description: '三欄式菜單（左：日期/據點/時段；中：輪播主秀；右：餐點列表）',
     convert: convertVis3,
+  },
+  vis_tv: {
+    key: 'vis_tv',
+    displayName: 'VIS_世界_電視版',
+    customer: '世界先進',
+    description: '由電腦版完整複製，作為電視版微調的基礎',
+    convert: convertVisTv,
   },
 };
 
