@@ -1048,15 +1048,43 @@ export async function autoGenerateSchedulesFromPlaylists(siteId: number) {
       }
     }
 
-    // 寫入
-    for (const u of updates) {
-      await sql`UPDATE signage_schedules SET play_date = ${u.play_date}, updated_at = CURRENT_TIMESTAMP WHERE id = ${u.id};`;
+    // ===== 批次寫入（取代原本逐筆 await，避免上百次往返導致 Serverless 逾時）=====
+    // 每筆 INSERT 用 6 個參數、UPDATE 用 2 個參數；Postgres 單次查詢參數上限 65535，
+    // 故以 1000 列為一批切塊，把上百次往返收斂成個位數次。
+    const CHUNK = 1000;
+
+    // 補填既有排程的 play_date：用 UPDATE ... FROM (VALUES ...) 一次更新多列
+    for (let i = 0; i < updates.length; i += CHUNK) {
+      const batch = updates.slice(i, i + CHUNK);
+      const params: (number | string)[] = [];
+      const tuples = batch.map((u, j) => {
+        const b = j * 2;
+        params.push(u.id, u.play_date);
+        return `($${b + 1}::int, $${b + 2}::date)`;
+      }).join(', ');
+      await sql.query(
+        `UPDATE signage_schedules AS s
+         SET play_date = v.pd, updated_at = CURRENT_TIMESTAMP
+         FROM (VALUES ${tuples}) AS v(vid, pd)
+         WHERE s.id = v.vid`,
+        params,
+      );
     }
-    for (const ins of inserts) {
-      await sql`
-        INSERT INTO signage_schedules (screen_id, playlist_id, start_time, end_time, days_of_week, play_date)
-        VALUES (${ins.screen_id}, ${ins.playlist_id}, ${ins.start}, ${ins.end}, ${ins.days}, ${ins.play_date});
-      `;
+
+    // 新增排程：單一多列 INSERT
+    for (let i = 0; i < inserts.length; i += CHUNK) {
+      const batch = inserts.slice(i, i + CHUNK);
+      const params: (number | string)[] = [];
+      const rowsSql = batch.map((ins, j) => {
+        const b = j * 6;
+        params.push(ins.screen_id, ins.playlist_id, ins.start, ins.end, ins.days, ins.play_date);
+        return `($${b + 1}::int, $${b + 2}::int, $${b + 3}::time, $${b + 4}::time, $${b + 5}, $${b + 6}::date)`;
+      }).join(', ');
+      await sql.query(
+        `INSERT INTO signage_schedules (screen_id, playlist_id, start_time, end_time, days_of_week, play_date)
+         VALUES ${rowsSql}`,
+        params,
+      );
     }
 
     return { success: true, data: { created, updated, skipped } };
