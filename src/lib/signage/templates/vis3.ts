@@ -94,6 +94,39 @@ function pad2(n: number): string {
   return String(n).padStart(2, '0');
 }
 
+/** 解析售價為數字；含 $、逗號等符號會被去除，無法解析者回傳 Infinity（排到最後） */
+function parsePrice(v: string | number): number {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : Infinity;
+  const n = parseFloat(String(v ?? '').replace(/[^\d.]/g, ''));
+  return Number.isNaN(n) ? Infinity : n;
+}
+
+/**
+ * 同一間餐廳內依售價由低到高排序。
+ * 餐廳的出現順序維持原始資料的先後（以首次出現為準），
+ * 僅在各餐廳群組「內部」依價格升冪重排，達成「同餐廳價低在上、價高在下」。
+ * 售價相同者維持原順序（穩定排序）。
+ */
+function sortByRestaurantThenPrice(items: MealItem[]): MealItem[] {
+  const order: string[] = [];
+  const groups = new Map<string, MealItem[]>();
+  for (const item of items) {
+    const r = item.餐廳名稱 ?? '';
+    if (!groups.has(r)) {
+      groups.set(r, []);
+      order.push(r);
+    }
+    groups.get(r)!.push(item);
+  }
+  const result: MealItem[] = [];
+  for (const r of order) {
+    const group = groups.get(r)!;
+    group.sort((a, b) => parsePrice(a.售價) - parsePrice(b.售價));
+    result.push(...group);
+  }
+  return result;
+}
+
 // ==================== 內嵌 CSS（原樣搬自 Python） ====================
 
 const CUSTOM_CSS = `
@@ -421,8 +454,10 @@ const CUSTOM_CSS = `
 // ==================== 主轉檔函式 ====================
 
 /** 產生單一組（同據點+時段+日期）的菜單 HTML */
-function generateGroupHtml(items: MealItem[]): { html: string; warnings: string[] } {
+function generateGroupHtml(itemsRaw: MealItem[]): { html: string; warnings: string[] } {
   const warnings: string[] = [];
+  // 同一間餐廳內依售價由低到高排序，輪播大圖與右側列表共用此順序
+  const items = sortByRestaurantThenPrice(itemsRaw);
   const first = items[0];
 
   const location = convertLocationName(first.據點 ?? '');
