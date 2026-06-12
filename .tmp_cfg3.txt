@@ -1,0 +1,54 @@
+=== b2_ilitek_dinner ===
+ css_path:../../css/b2_ilitek_dinner.css tmpl:template_b2_4x.css
+ images:{"corner_logo": "../../pic/btw_side_logo_white.png", "company_logo": "../../pic/logos/ilitek_logo.png", "qr_code": "../../pic/qrcode/qr-ilitek.png"}
+ qr_text:註冊&客服專線 | notices_keys:['訂餐時間', '取餐時間', '異常處理', '補充說明']
+ LOC:{"奕力-午餐便當專區": "奕力", "奕力-晚餐便當專區": "奕力", "奕力-自費飲料專區": "奕力"}
+ MEAL:{"午餐": "午餐時段", "晚餐": "晚餐時段", "下午茶": "自費飲料"}
+=== b2_ilitek_drink ===
+ css_path:../../css/b2_ilitek_drink.css tmpl:template_b2_h1.css
+ images:{"corner_logo": "../../pic/btw_side_logo_white.png", "company_logo": "../../pic/logos/ilitek_logo.png", "qr_code": "../../pic/qrcode/qr-ilitek.png"}
+ qr_text:註冊&客服專線 | notices_keys:['訂餐時間', '取餐時間', '異常處理', '補充說明']
+ LOC:{"奕力-午餐便當專區": "奕力", "奕力-晚餐便當專區": "奕力", "奕力-自費飲料專區": "奕力"}
+ MEAL:{"午餐": "午餐時段", "晚餐": "晚餐時段", "下午茶": "自費飲料"}
+=== b2_richtek_drink ===
+ css_path:../../css/b2_demo.css tmpl:template_b2_h1.css
+ images:{"corner_logo": "../../pic/btw_side_logo_white.png", "company_logo": "../../pic/logos/richtek_logo.png", "qr_code": "../../pic/qrcode/qr-richtek.png"}
+ qr_text:註冊&客服專線 | notices_keys:['訂餐時間', '取餐時間', '異常處理', '補充說明']
+ LOC:{"奕力-午餐便當專區": "立錡", "奕力-晚餐便當專區": "立錡", "奕力-自費飲料專區": "立錡"}
+ MEAL:{"午餐": "午餐時段", "晚餐": "晚餐時段", "下午茶": "飲料"}
+=== basic_demo ===
+ css_path:../../css/basic_demo.css tmpl:template_b_h1.css
+ images:{"corner_logo": "../../pic/btw_side_logo_white.png", "company_logo": "../../pic/logos/ilitek_logo.png", "qr_code": "../../pic/qrcode/qr-ilitek.png"}
+ qr_text:註冊&客服專線 | notices_keys:['訂餐時間', '取餐時間', '異常處理', '補充說明']
+ LOC:{"奕力-午餐便當專區": "奕力", "奕力-晚餐便當專區": "奕力", "奕力-自費飲料專區": "奕力"}
+ MEAL:{"午餐": "午餐時段", "晚餐": "晚餐時段", "下午茶": "自費飲料"}
+=== bty_ilitek ===
+ css_path:../../css/bty_ilitek.css tmpl:template_b_h1.css
+ images:{"corner_logo": "../../pic/btw_side_logo_white.png", "company_logo": "../../pic/logos/ilitek_logo.png", "qr_code": "../../pic/qrcode/qr-ilitek.png"}
+ qr_text:註冊&客服專線 | notices_keys:['訂餐時間', '取餐時間', '異常處理', '補充說明']
+ LOC:{"奕力-午餐便當專區": "奕力", "奕力-晚餐便當專區": "奕力", "奕力-自費飲料專區": "奕力"}
+ MEAL:{"午餐": "午餐時段", "晚餐": "晚餐時段", "下午茶": "自費飲料"}
+=== bty_richtek ===
+ css_path:../../css/bty_richtek.css tmpl:template_b_h1.css
+ images:{"corner_logo": "../../pic/btw_side_logo_white.png", "company_logo": "../../pic/logos/richtek_logo.png", "qr_code": "../../pic/qrcode/qr-richtek.png"}
+ qr_text:註冊&客服專線 | notices_keys:['訂餐時間', '取餐時間', '異常處理', '補充說明']
+ LOC:{"立錡-DDS": "DDS 9F 餐廳", "立錡-總公司餐廳": "總公司 13F 餐廳"}
+ MEAL:{"午餐": "午餐", "晚餐": "晚餐", "下午茶": "飲料"}
+=== bty_sigmstar ===
+ css_path:../../css/bty_sigmstar.css tmpl:template_b_h1.css
+ images:{"corner_logo": "../../pic/btw_side_logo_white.png", "company_logo": "../../pic/logos/sigmstar_logo.png", "qr_code": "../../pic/qrcode/qr-sigmstar.png"}
+ qr_text:註冊&客服專線 | notices_keys:['訂餐時間', '取餐時間', '異常處理', '補充說明']
+ LOC:{"奕力-午餐便當專區": "奕力", "奕力-晚餐便當專區": "奕力", "奕力-自費飲料專區": "奕力"}
+ MEAL:{"午餐": "午餐時段", "晚餐": "晚餐時段", "下午茶": "自費飲料"}
+=== bwec_nan ===
+ css_path:../../css/bwec_ntc.css tmpl:template_b_h1.css
+ images:{"corner_logo": "../../pic/btw_side_logo_white.png", "company_logo": "../../pic/logos/winbond_logo.png", "qr_code": "../../pic/qrcode/qr_winbond.png"}
+ qr_text:註冊&客服專線 | notices_keys:['訂餐時間', '取餐時間', '異常處理', '補充說明']
+ LOC:{"奕力-午餐便當專區": "奕力", "奕力-晚餐便當專區": "奕力", "奕力-自費飲料專區": "奕力"}
+ MEAL:{"午餐": "午餐", "晚餐": "晚餐", "下午茶": "飲料"}
+=== bwec_ntc ===
+ css_path:../../css/bwec_ntc.css tmpl:template_b_h1.css
+ images:{"corner_logo": "../../pic/btw_side_logo_white.png", "company_logo": "../../pic/logos/winbond_logo.png", "qr_code": "../../pic/qrcode/qr_winbond.png"}
+ qr_text:註冊&客服專線 | notices_keys:['訂餐時間', '取餐時間', '異常處理', '補充說明']
+ LOC:{"奕力-午餐便當專區": "奕力", "奕力-晚餐便當專區": "奕力", "奕力-自費飲料專區": "奕力"}
+ MEAL:{"午餐": "午餐", "晚餐": "晚餐", "下午茶": "飲料"}

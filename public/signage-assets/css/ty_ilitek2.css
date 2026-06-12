@@ -1,0 +1,468 @@
+/* ======================
+   設計參數變數
+   ====================== */
+:root {
+    /* 顏色系統 */
+    --primary-color: #5b2e86;    /* 主要文字顏色 */
+    --secondary-color: #e74c3c;  /* 次要強調色 */
+    --price-color: #e74c3c;      /* 價格顏色 */
+    --background-color: #ffffff; /* 背景顏色 */
+    --border-color: #5b2e86;     /* 邊框顏色 */
+    --date-bg: #5b2e86;          /* 日期標籤背景 */
+    --date-text: #ffffff;        /* 日期標籤文字 */
+    --title-bg: #5b2e86;         /* 標題背景 */
+    --frame-bg: #5b2e86;         /* 框架背景顏色 */
+    --frame-border: #000;        /* 框架邊框顏色 */
+    --content-bg: #f5f5f5;       /* 內容區塊背景色 */
+    
+    /* 字體系統 */
+    --font-size-base: 21px;      /* 基礎字體大小 */
+    --font-size-title: 42px;     /* 大標題 */
+    --font-size-date: 23px;      /* 日期標籤 */
+    --font-size-restaurant: 22px;/* 餐廳名稱 */
+    --font-size-price: 22px;     /* 價格數字 */
+    --font-size-price-prefix: 12px; /* 價格符號 */
+    --font-size-menu-item: 21px; /* 餐點名稱 */
+    --font-size-copyright: 16px; /* 餐點名稱 */
+    
+    /* 字重系統 */
+    --font-weight-thin: 100;     /* 極細 */
+    --font-weight-light: 300;    /* 細 */
+    --font-weight-regular: 400;  /* 標準 */
+    --font-weight-bold: 700;     /* 粗 */
+    --font-weight-black: 900;    /* 特粗 */
+    
+    /* 尺寸系統 */
+    --border-radius: 20px;       /* 基礎圓角 */
+    --box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* 標準陰影 */
+    --container-width: 1080px;   /* 主容器寬度 */
+}
+
+/* ======================
+   基礎樣式
+   ====================== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: "HarmonyOS Sans TC", "Microsoft JhengHei", sans-serif;
+    font-weight: var(--font-weight-regular);
+    color: var(--primary-color);
+    line-height: 1.6;
+    background: transparent;
+}
+
+/* ======================
+   主容器與框架
+   ====================== */
+.frame {
+    width: var(--container-width);
+    height: 1528px;
+    margin: 0 auto;
+    position: relative;     /* 確保邊框正確包含內容 */
+    border: 1px solid var(--frame-border);
+    background-color: var(--frame-bg);
+    background-image: url('../pic/bg-food.png');  /* 修正圖片路徑 */
+    background-repeat: repeat;
+    background-blend-mode: soft-light;  /* 讓背景圖與背景色混合 */
+    background-size: 470px auto;        /* 控制背景圖的大小 */
+}
+
+/* 新增尺寸驗證提示 */
+.frame::after {
+    content: "1080×1528";
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    font-size: 10px;
+    color: rgba(255,255,255,0.3);  /* 改為白色半透明，以便在深色背景上看清 */
+    pointer-events: none;  /* 防止影響點擊操作 */
+}
+
+.container {
+    margin: 15px 0 0 0;  /* 只保留上方間距 */
+    padding: 0 12px;
+}
+
+/* ======================
+   日期區塊樣式
+   ====================== */
+.date-section {
+    flex-direction: column;
+    margin-bottom: 9px;
+    padding: 2px;
+    background-color: var(--background-color);
+    border: 2px solid var(--border-color);
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+}
+
+.date-info {
+    width: 100%;
+    min-height: 30px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: -14px;
+}
+
+.date-display {
+    font-family: "HarmonyOS Sans TC";
+    font-weight: var(--font-weight-regular);
+    font-size: var(--font-size-date);
+    color: var(--date-text);
+    background-color: var(--date-bg);
+    padding: 4px 42px !important;
+    margin: 8px auto -10px;
+    border-radius: 5px 5px 20px 20px;  /* 只保留下方圓角 */
+    line-height: 1.2;
+    white-space: nowrap;
+    letter-spacing: 0.5px;
+}
+
+/* ======================
+   餐廳菜單佈局
+   ====================== */
+.restaurants-grid {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 32px;
+    justify-content: flex-start;
+    padding: 0px 25px;
+}
+
+.restaurant-section {
+    flex: 0 0 calc(50% - 16px);
+    padding: 0px 10px 6px;
+    border-radius: calc(var(--border-radius) - 5px);
+    display: flex;
+    align-items: center;
+    min-height: 140px;
+    margin-bottom: -18px;
+}
+
+.menu-content {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    padding: 10px 0;
+}
+
+/* ======================
+   菜單細節樣式
+   ====================== */
+.restaurant-name {
+    font-weight: var(--font-weight-bold);
+    font-size: var(--font-size-restaurant);
+    color: var(--primary-color);
+    word-break: break-word;
+    margin-bottom: 10px;
+    padding-left: 5px;
+    border-bottom: 1px dashed var(--primary-color);
+}
+
+.menu-details {
+    display: flex;
+    gap: 15px;
+    align-items: normal;
+    height: 100%;
+}
+
+.menu-image {
+    width: 130px;
+    height: 130px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.menu-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 4px;
+}
+
+/* ======================
+   價格與文字樣式
+   ====================== */
+.menu-items {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.menu-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.price {
+    color: var(--price-color);
+    min-width: 70px;
+    text-align: right;
+    margin-right: 10px;
+    display: flex;
+    justify-content: flex-end;
+    align-items: baseline;
+    gap: 4px;
+}
+
+.price-prefix {
+    font-weight: var(--font-weight-bold);
+    font-size: var(--font-size-price-prefix);
+}
+
+.price-number {
+    font-weight: var(--font-weight-bold);
+    font-size: var(--font-size-price);
+}
+
+/* ======================
+   標題區樣式
+   ====================== */
+.edm-title {
+    min-height: 160px;
+    padding: 20px 8px;
+    display: flex !important;
+    flex-direction: column;
+    justify-content: center;
+    background: transparent;
+    position: relative;  /* 添加相對定位 */
+}
+
+/* Logo 容器樣式 */
+.logo-container {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 15px;
+}
+
+/* 標題資訊容器樣式 */
+.title-info-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    padding: 15px 0;  /* 加點內間距 */
+    margin: -12px 0;
+}
+
+.title-info-group {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 15px;
+    justify-content: center;
+}
+
+.info-value {
+    font-weight: var(--font-weight-bold);
+    font-size: var(--font-size-title);
+    color: var(--primary-color);
+    white-space: nowrap;  /* 防止換行 */
+    padding-left: 10px;
+}
+
+.location-period-group {
+    display: flex;
+    gap: 0;
+    white-space: nowrap;  /* 防止換行 */
+}
+
+.title-logo {
+    max-height: 100px;
+    width: auto;
+    object-fit: contain;
+    background-color: var(--content-bg);
+    padding: 20px 155px 35px;
+    margin-bottom: -42px;
+    border-radius: 62px 62px 0 0;  /* 只設定上方左右角的圓角 */
+}
+
+.info-location {
+    font-weight: var(--font-weight-black);
+    font-size: var(--font-size-title);
+    color: var(--date-text);
+    background-color: var(--title-bg);
+    padding: 0px 10px;
+    border-radius: 12px;
+    margin-right: 0;
+}
+
+.chinese-name {
+    font-weight: var(--font-weight-regular);
+    font-size: var(--font-size-menu-item);
+    margin-bottom: 4px;
+}
+
+.english-name {
+    display: none !important; /* 強制隱藏英文名稱 */
+}
+
+/* ======================
+    主要內容容器
+    ====================== */
+.main-content-wrapper {
+    background-color: var(--content-bg);
+    border-radius: var(--border-radius);
+    padding: 3px;
+    margin: 0 6px;
+}
+
+/* ======================
+    頁尾容器樣式
+    ====================== */
+.footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 6px;
+    margin: 15px 10px;
+}
+
+.qr-code {
+    flex: 0 0 21%;
+    background-color: var(--content-bg);
+    border-radius: var(--border-radius);
+    padding: 12px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-left: -5px;
+}
+
+.qr-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.qr-image {
+    width: 100%;
+    height: auto;
+    max-width: 145px;
+    object-fit: contain;
+}
+
+.qr-text {
+    color: var(--primary-color);
+    font-size: var(--font-size-base);
+    text-align: center;
+    font-weight: var(--font-weight-bold);
+}
+
+.notice {
+    flex: 0 0 78%;
+    background-color: var(--content-bg);
+    border-radius: var(--border-radius);
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-right: -8px;
+    position: relative;  /* 添加相對定位 */
+}
+
+/* 版權宣告樣式 */
+.copyright {
+    position: absolute;
+    bottom: 8px;
+    right: 12px;
+    font-size: var(--font-size-copyright);  /* 使用最小字體大小 */
+    color: var(--primary-color);
+    opacity: 0.8;  /* 稍微調低不透明度 */
+}
+
+.notice-item {
+    display: flex;
+    align-items: baseline;
+    gap: 15px;
+}
+
+.notice-title {
+    font-weight: var(--font-weight-bold);
+    color: var(--primary-color);
+    white-space: nowrap;
+    font-size: var(--font-size-base);
+    position: relative;
+    padding-left: 15px;
+}
+
+.notice-title::before {
+    content: " ";
+    
+    position: absolute;
+    left: 0;
+    color: var(--primary-color);
+}
+
+.notice-content {
+    font-size: var(--font-size-base);
+    color: var(--primary-color);
+    line-height: 1.5;
+}
+
+/* ======================
+   右上角 Logo 樣式
+   ====================== */
+.corner-logo {
+    position: absolute;
+    top: 10px;  /* 調整位置到 edm-title 的上方 */
+    right: 25px;
+    z-index: 10;
+}
+
+.corner-logo img {
+    width: auto;
+    height: 38px;
+    object-fit: contain;
+}
+
+
+/* ======================
+   字體定義
+   ====================== */
+   @font-face {
+    font-family: 'HarmonyOS Sans TC';
+    src: url('../font/HarmonyOS_Sans_TC_Thin.ttf') format('truetype');
+    font-weight: 100;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'HarmonyOS Sans TC';
+    src: url('../font/HarmonyOS_Sans_TC_Light.ttf') format('truetype');
+    font-weight: 300;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'HarmonyOS Sans TC';
+    src: url('../font/HarmonyOS_Sans_TC_Regular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'HarmonyOS Sans TC';
+    src: url('../font/HarmonyOS_Sans_TC_Bold.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'HarmonyOS Sans TC';
+    src: url('../font/HarmonyOS_Sans_TC_Black.ttf') format('truetype');
+    font-weight: 900;
+    font-style: normal;
+}
