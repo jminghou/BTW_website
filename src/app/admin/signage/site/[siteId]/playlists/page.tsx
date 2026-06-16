@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
+import { matchFilename } from '@/lib/signage/filenameFilter';
 
 interface Playlist {
   id: number;
@@ -32,6 +33,8 @@ export default function SitePlaylistsPage() {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  // 清單名稱快速篩選關鍵字（沿用檔名命名邏輯：廠區_餐期_年份-月份-日期）
+  const [filterText, setFilterText] = useState('');
   // 記住上一次點選的列索引，作為 Shift 範圍選取的錨點
   const lastIndexRef = useRef<number | null>(null);
   const [actionMsg, setActionMsg] = useState('');
@@ -100,6 +103,10 @@ export default function SitePlaylistsPage() {
     }
   };
 
+  // 套用名稱篩選後的清單；選取、全選、Shift 範圍選取皆以此為準
+  const filteredPlaylists = playlists.filter(p => matchFilename(p.name, filterText));
+  const allFilteredSelected = filteredPlaylists.length > 0 && filteredPlaylists.every(p => selectedIds.has(p.id));
+
   // ---- 批次選取/刪除 ----
   const toggleSelect = (id: number) => {
     setSelectedIds(prev => {
@@ -108,15 +115,23 @@ export default function SitePlaylistsPage() {
       return next;
     });
   };
-  const selectAll = () => setSelectedIds(new Set(playlists.map(p => p.id)));
-  const deselectAll = () => setSelectedIds(new Set());
+  const selectAll = () => setSelectedIds(prev => {
+    const next = new Set(prev);
+    filteredPlaylists.forEach(p => next.add(p.id));
+    return next;
+  });
+  const deselectAll = () => setSelectedIds(prev => {
+    const next = new Set(prev);
+    filteredPlaylists.forEach(p => next.delete(p.id));
+    return next;
+  });
 
   // 點名稱／核取方塊時呼叫；按住 Shift 則從上一個錨點到本列整段一併選取
   const selectRow = (index: number, id: number, shiftKey: boolean) => {
     if (shiftKey && lastIndexRef.current !== null) {
       const start = Math.min(lastIndexRef.current, index);
       const end = Math.max(lastIndexRef.current, index);
-      const rangeIds = playlists.slice(start, end + 1).map(p => p.id);
+      const rangeIds = filteredPlaylists.slice(start, end + 1).map(p => p.id);
       setSelectedIds(prev => {
         const next = new Set(prev);
         rangeIds.forEach(rid => next.add(rid));
@@ -307,7 +322,7 @@ export default function SitePlaylistsPage() {
     setItemSaveMsg(json.success ? '✅ 已儲存' : `❌ ${json.message}`);
   };
 
-  const allSelected = playlists.length > 0 && selectedIds.size === playlists.length;
+  const allSelected = allFilteredSelected;
 
   return (
     <div className="space-y-6">
@@ -337,6 +352,25 @@ export default function SitePlaylistsPage() {
           刪除選取項目 ({selectedIds.size})
         </button>
         {actionMsg && <span className="text-sm text-gray-600 ml-2">{actionMsg}</span>}
+      </div>
+
+      {/* 名稱快速篩選：直接輸入即時過濾（例：16＝某日、L＝午餐、F3＝廠區，可空白組合） */}
+      <div className="flex items-center gap-3">
+        <div className="relative w-full md:w-96">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+          <input
+            type="text"
+            value={filterText}
+            onChange={e => setFilterText(e.target.value)}
+            placeholder="篩選名稱… 例：16（某日）、L（午餐）、F3（廠區）"
+            className="w-full pl-9 pr-9 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-cyan-500"
+          />
+          {filterText && (
+            <button type="button" onClick={() => setFilterText('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
+          )}
+        </div>
+        {filterText && <span className="text-sm text-gray-400 whitespace-nowrap">篩選出 {filteredPlaylists.length} / {playlists.length}</span>}
       </div>
 
       {showForm && (
@@ -378,7 +412,9 @@ export default function SitePlaylistsPage() {
               <tr><td colSpan={4} className="px-4 py-8 text-center text-gray-400">載入中...</td></tr>
             ) : playlists.length === 0 ? (
               <tr><td colSpan={4} className="px-4 py-8 text-center text-gray-400">尚無播放清單</td></tr>
-            ) : playlists.map((p, idx) => (
+            ) : filteredPlaylists.length === 0 ? (
+              <tr><td colSpan={4} className="px-4 py-8 text-center text-gray-400">沒有符合「{filterText}」的播放清單</td></tr>
+            ) : filteredPlaylists.map((p, idx) => (
               <tr key={p.id} className={`border-b border-gray-100 hover:bg-gray-50 ${selectedIds.has(p.id) ? 'bg-cyan-50' : ''}`}>
                 <td className="px-3 py-3">
                   <input type="checkbox" checked={selectedIds.has(p.id)} onChange={() => {}}

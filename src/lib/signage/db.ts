@@ -466,6 +466,23 @@ export async function createAsset(data: {
   }
 }
 
+export async function updateAssetBlobUrl(id: number, blobUrl: string) {
+  try {
+    const result = await sql`
+      UPDATE signage_assets SET blob_url = ${blobUrl}
+      WHERE id = ${id}
+      RETURNING id, site_id, filename, blob_url;
+    `;
+    if (result.length === 0) {
+      return { success: false, error: '找不到指定的素材' };
+    }
+    return { success: true, data: result[0] };
+  } catch (error) {
+    console.error('更新素材內容時發生錯誤：', error);
+    return { success: false, error };
+  }
+}
+
 export async function deleteAsset(id: number) {
   try {
     const result = await sql`

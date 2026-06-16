@@ -5,6 +5,7 @@ import {
   getPlaylistItemsByPlaylistId,
 } from '@/lib/signage/db';
 import { matchSchedule, type ScheduleRow } from '@/lib/signage/schedule';
+import { assetProxyUrl } from '@/lib/signage/assetVersion';
 
 /**
  * 強制每次請求都即時查資料庫，不走 Next.js 的 Data Cache。
@@ -97,9 +98,11 @@ export async function GET(
     }>) ?? [];
 
     // 透過 proxy 路由提供 .html，避免 Vercel Blob 的 attachment disposition
-    // 讓 iframe 能正常嵌入渲染（而非觸發下載）
+    // 讓 iframe 能正常嵌入渲染（而非觸發下載）。
+    // 網址帶 ?v={blob 版本碼}：素材一經編輯版本碼就變，iframe 會重載、CDN 也會 miss
+    // → 前台立即看到新內容（最慢只差一個排程輪詢週期）。
     const items = rawItems.map(it => ({
-      url: `/api/signage/asset/${it.asset_id}`,
+      url: assetProxyUrl(it.asset_id, it.blob_url),
       duration: it.duration_seconds,
       filename: it.filename,
       description: it.description,
