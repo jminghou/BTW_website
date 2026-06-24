@@ -297,6 +297,8 @@ export default function SiteAssetsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   // 檔名快速篩選關鍵字（依檔名命名邏輯：廠區_餐期_年份-月份-日期）
   const [filterText, setFilterText] = useState('');
+  // 檔名排序方向：null＝維持原順序（上傳時間）／asc 升冪／desc 降冪
+  const [filenameSort, setFilenameSort] = useState<'asc' | 'desc' | null>(null);
   // 記住上一次點選的列索引，作為 Shift 範圍選取的錨點
   const lastIndexRef = useRef<number | null>(null);
 
@@ -393,9 +395,20 @@ export default function SiteAssetsPage() {
     }
   };
 
-  // 套用檔名篩選後的清單；選取、全選、Shift 範圍選取皆以此為準
+  // 套用檔名篩選後的清單
   const filteredAssets = assets.filter(a => matchFilename(a.filename, filterText));
-  const allFilteredSelected = filteredAssets.length > 0 && filteredAssets.every(a => selectedIds.has(a.id));
+  // 再依檔名排序（以中文筆劃＋數字大小比較：'zh-Hant-u-co-stroke' + numeric）；
+  // 選取、全選、Shift 範圍選取與列表渲染皆以此排序後的清單為準
+  const displayAssets = filenameSort
+    ? [...filteredAssets].sort((a, b) => {
+        const r = a.filename.localeCompare(b.filename, 'zh-Hant-u-co-stroke', { numeric: true });
+        return filenameSort === 'asc' ? r : -r;
+      })
+    : filteredAssets;
+  const allFilteredSelected = displayAssets.length > 0 && displayAssets.every(a => selectedIds.has(a.id));
+  // 點檔名標題循環切換：原順序 → 升冪 → 降冪 → 原順序
+  const toggleFilenameSort = () =>
+    setFilenameSort(prev => (prev === null ? 'asc' : prev === 'asc' ? 'desc' : null));
 
   const toggleSelect = (id: number) => {
     setSelectedIds(prev => {
@@ -408,13 +421,13 @@ export default function SiteAssetsPage() {
     if (allFilteredSelected) {
       setSelectedIds(prev => {
         const next = new Set(prev);
-        filteredAssets.forEach(a => next.delete(a.id));
+        displayAssets.forEach(a => next.delete(a.id));
         return next;
       });
     } else {
       setSelectedIds(prev => {
         const next = new Set(prev);
-        filteredAssets.forEach(a => next.add(a.id));
+        displayAssets.forEach(a => next.add(a.id));
         return next;
       });
     }
@@ -425,7 +438,7 @@ export default function SiteAssetsPage() {
     if (shiftKey && lastIndexRef.current !== null) {
       const start = Math.min(lastIndexRef.current, index);
       const end = Math.max(lastIndexRef.current, index);
-      const rangeIds = filteredAssets.slice(start, end + 1).map(a => a.id);
+      const rangeIds = displayAssets.slice(start, end + 1).map(a => a.id);
       setSelectedIds(prev => {
         const next = new Set(prev);
         rangeIds.forEach(rid => next.add(rid));
@@ -893,13 +906,30 @@ export default function SiteAssetsPage() {
           </div>
         </div>
 
-        <table className="w-full text-sm">
+        <table className="w-full text-sm table-fixed">
+          <colgroup>
+            <col className="w-10" />        {/* 核取方塊 */}
+            <col />                          {/* 檔名（佔用剩餘寬度） */}
+            <col className="w-40" />        {/* 說明（縮窄） */}
+            <col className="w-28" />        {/* 上傳時間 */}
+            <col className="w-56" />        {/* 操作（拉寬，容納 4 個按鈕並排） */}
+          </colgroup>
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
               <th className="px-3 py-3 w-10">
                 <input type="checkbox" onChange={toggleSelectAll} checked={allFilteredSelected} />
               </th>
-              <th className="px-3 py-3 text-left font-medium text-gray-700">檔名</th>
+              <th className="px-3 py-3 text-left font-medium text-gray-700">
+                <button type="button" onClick={toggleFilenameSort}
+                  className="inline-flex items-center gap-1 hover:text-cyan-700"
+                  title="依檔名（筆劃／數字）排序">
+                  檔名
+                  <span className="flex flex-col leading-[0.6] text-[9px]">
+                    <span className={filenameSort === 'asc' ? 'text-cyan-600' : 'text-gray-300'}>▲</span>
+                    <span className={filenameSort === 'desc' ? 'text-cyan-600' : 'text-gray-300'}>▼</span>
+                  </span>
+                </button>
+              </th>
               <th className="px-3 py-3 text-left font-medium text-gray-700">說明</th>
               <th className="px-3 py-3 text-left font-medium text-gray-700">上傳時間</th>
               <th className="px-3 py-3 text-right font-medium text-gray-700">操作</th>
@@ -910,19 +940,19 @@ export default function SiteAssetsPage() {
               <tr><td colSpan={5} className="px-3 py-8 text-center text-gray-400">載入中...</td></tr>
             ) : assets.length === 0 ? (
               <tr><td colSpan={5} className="px-3 py-8 text-center text-gray-400">尚無素材</td></tr>
-            ) : filteredAssets.length === 0 ? (
+            ) : displayAssets.length === 0 ? (
               <tr><td colSpan={5} className="px-3 py-8 text-center text-gray-400">沒有符合「{filterText}」的素材</td></tr>
-            ) : filteredAssets.map((a, idx) => (
+            ) : displayAssets.map((a, idx) => (
               <tr key={a.id} className={`border-b border-gray-100 hover:bg-gray-50 ${selectedIds.has(a.id) ? 'bg-cyan-50' : ''}`}>
-                <td className="px-3 py-3">
+                <td className="px-3 py-3 align-top">
                   <input type="checkbox" checked={selectedIds.has(a.id)} onChange={() => {}}
                     onClick={e => selectRow(idx, a.id, e.shiftKey)} />
                 </td>
-                <td className="px-3 py-3 font-mono text-cyan-700 cursor-pointer select-none"
+                <td className="px-3 py-3 font-mono text-cyan-700 cursor-pointer select-none break-words align-top"
                   onClick={e => selectRow(idx, a.id, e.shiftKey)}>{a.filename}</td>
-                <td className="px-3 py-3 text-gray-600">{a.description || '—'}</td>
-                <td className="px-3 py-3 text-xs text-gray-400">{new Date(a.upload_timestamp).toLocaleString('zh-TW')}</td>
-                <td className="px-3 py-3 text-right">
+                <td className="px-3 py-3 text-gray-600 break-words align-top">{a.description || '—'}</td>
+                <td className="px-3 py-3 text-xs text-gray-400 break-words align-top">{new Date(a.upload_timestamp).toLocaleString('zh-TW')}</td>
+                <td className="px-3 py-3 text-right whitespace-nowrap align-top">
                   <a href={assetProxyUrl(a.id, a.blob_url)} target="_blank" rel="noopener noreferrer" className="text-cyan-600 hover:underline mr-3">預覽</a>
                   <button onClick={() => openEdit(a)} className="text-amber-600 hover:underline mr-3">編輯</button>
                   <button onClick={() => handleScreenshot(a)} disabled={shotId === a.id}

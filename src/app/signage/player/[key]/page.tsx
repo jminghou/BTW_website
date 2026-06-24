@@ -21,7 +21,7 @@ interface PlayerResponse {
   current_time?: string;
 }
 
-const POLL_INTERVAL_MS = 60_000; // 每分鐘輪詢一次排程
+const POLL_INTERVAL_MS = 60_000; // 每分鐘輪詢一次（命中邊緣快取不會打 DB，故不增加成本；確保 3 分鐘快取過期後螢幕能盡快抓到新內容）
 
 export default function PlayerPage() {
   const params = useParams<{ key: string }>();

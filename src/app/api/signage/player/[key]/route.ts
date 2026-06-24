@@ -16,8 +16,8 @@ import { assetProxyUrl } from '@/lib/signage/assetVersion';
  *   舊狀態（1 個項目、180 秒）」→ 螢幕只播第一頁。
  *   標記 force-dynamic + revalidate=0 可關閉框架層快取，確保排程/清單即時生效。
  *
- *   注意：下方仍對「回應本身」設 Cache-Control s-maxage=60，
- *   那是 CDN 邊緣快取（最多延遲 60 秒，刻意保留以減少 Neon 連線），
+ *   注意：下方仍對「回應本身」設 Cache-Control s-maxage=180，
+ *   那是 CDN 邊緣快取（最多延遲 3 分鐘，刻意拉長以減少 Neon compute 被喚醒的次數），
  *   與這裡關閉的「資料讀取快取」是不同層級，兩者並存沒有衝突。
  */
 export const dynamic = 'force-dynamic';
@@ -30,8 +30,8 @@ export const revalidate = 0;
  * 對應 v2.0 backend/api/player.py:get_current_schedule
  * 由螢幕端定期輪詢，回傳當前該播放的清單
  *
- * 加 Cache-Control: max-age=60 讓 Vercel Edge 與瀏覽器可快取一分鐘
- * → 降低對 Neon DB 的擊穿次數（讓 DB 能 auto-suspend 省運算時數）
+ * 加 Cache-Control: max-age=180 讓 Vercel Edge 可快取 3 分鐘
+ * → 每個螢幕約每 3 分鐘才真正打一次 DB，讓 compute 能 auto-suspend 省運算時數
  */
 export async function GET(
   req: NextRequest,
@@ -77,7 +77,7 @@ export async function GET(
         screen_name: screen.name,
         current_time: new Date().toISOString(),
       }, {
-        headers: { 'Cache-Control': 'public, max-age=60, s-maxage=60' },
+        headers: { 'Cache-Control': 'public, max-age=180, s-maxage=180' },
       });
     }
 
@@ -117,7 +117,7 @@ export async function GET(
       screen_name: screen.name,
       current_time: new Date().toISOString(),
     }, {
-      headers: { 'Cache-Control': 'public, max-age=60, s-maxage=60' },
+      headers: { 'Cache-Control': 'public, max-age=180, s-maxage=180' },
     });
   } catch (error) {
     console.error('播放器 API 錯誤：', error);

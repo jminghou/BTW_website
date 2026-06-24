@@ -94,10 +94,17 @@ export async function createSignageTables() {
         end_time TIME NOT NULL,
         days_of_week VARCHAR(50) NOT NULL,
         play_date DATE,
+        start_date DATE,
+        end_date DATE,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `;
+
+    // 既有資料庫的相容遷移：日期區間排程（start_date ~ end_date）。
+    // CREATE TABLE IF NOT EXISTS 不會為「已存在」的表補欄位，故需 ALTER。
+    await sql`ALTER TABLE signage_schedules ADD COLUMN IF NOT EXISTS start_date DATE;`;
+    await sql`ALTER TABLE signage_schedules ADD COLUMN IF NOT EXISTS end_date DATE;`;
 
     // 各廠區的餐期時段設定（一鍵列表轉排程依此判斷餐期對應的播放時間）
     await sql`
@@ -1118,7 +1125,7 @@ export async function getSchedules(screenId?: number) {
     const result = screenId
       ? await sql`
           SELECT s.id, s.screen_id, s.playlist_id, s.start_time, s.end_time,
-                 s.days_of_week, s.play_date, s.created_at,
+                 s.days_of_week, s.play_date, s.start_date, s.end_date, s.created_at,
                  sc.name AS screen_name, p.name AS playlist_name
           FROM signage_schedules s
           LEFT JOIN signage_screens sc ON s.screen_id = sc.id
@@ -1128,7 +1135,7 @@ export async function getSchedules(screenId?: number) {
         `
       : await sql`
           SELECT s.id, s.screen_id, s.playlist_id, s.start_time, s.end_time,
-                 s.days_of_week, s.play_date, s.created_at,
+                 s.days_of_week, s.play_date, s.start_date, s.end_date, s.created_at,
                  sc.name AS screen_name, p.name AS playlist_name
           FROM signage_schedules s
           LEFT JOIN signage_screens sc ON s.screen_id = sc.id
@@ -1146,7 +1153,7 @@ export async function getSchedulesByScreenKey(uniqueKey: string) {
   try {
     const result = await sql`
       SELECT s.id, s.screen_id, s.playlist_id, s.start_time, s.end_time,
-             s.days_of_week, s.play_date,
+             s.days_of_week, s.play_date, s.start_date, s.end_date,
              p.name AS playlist_name, sc.name AS screen_name
       FROM signage_schedules s
       INNER JOIN signage_screens sc ON s.screen_id = sc.id
@@ -1183,17 +1190,19 @@ export interface ScheduleInput {
   start_time: string; // "HH:MM" or "HH:MM:SS"
   end_time: string;
   days_of_week: number[]; // [1,2,3,4,5] 週一到週五
-  play_date?: string | null; // "YYYY-MM-DD" 或 null
+  play_date?: string | null; // 特定單日 "YYYY-MM-DD" 或 null
+  start_date?: string | null; // 日期區間起 "YYYY-MM-DD" 或 null
+  end_date?: string | null; // 日期區間迄 "YYYY-MM-DD" 或 null
 }
 
 export async function createSchedule(data: ScheduleInput) {
   try {
     const daysJson = JSON.stringify(data.days_of_week);
     const result = await sql`
-      INSERT INTO signage_schedules (screen_id, playlist_id, start_time, end_time, days_of_week, play_date)
+      INSERT INTO signage_schedules (screen_id, playlist_id, start_time, end_time, days_of_week, play_date, start_date, end_date)
       VALUES (${data.screen_id}, ${data.playlist_id}, ${data.start_time}, ${data.end_time},
-              ${daysJson}, ${data.play_date || null})
-      RETURNING id, screen_id, playlist_id, start_time, end_time, days_of_week, play_date, created_at;
+              ${daysJson}, ${data.play_date || null}, ${data.start_date || null}, ${data.end_date || null})
+      RETURNING id, screen_id, playlist_id, start_time, end_time, days_of_week, play_date, start_date, end_date, created_at;
     `;
     return { success: true, data: result[0] };
   } catch (error) {
@@ -1217,9 +1226,11 @@ export async function updateSchedule(id: number, data: Partial<ScheduleInput>) {
         end_time = COALESCE(${data.end_time ?? null}, end_time),
         days_of_week = COALESCE(${daysJson}, days_of_week),
         play_date = ${data.play_date === undefined ? null : data.play_date},
+        start_date = ${data.start_date === undefined ? null : data.start_date},
+        end_date = ${data.end_date === undefined ? null : data.end_date},
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ${id}
-      RETURNING id, screen_id, playlist_id, start_time, end_time, days_of_week, play_date, updated_at;
+      RETURNING id, screen_id, playlist_id, start_time, end_time, days_of_week, play_date, start_date, end_date, updated_at;
     `;
     return { success: true, data: result[0] };
   } catch (error) {
@@ -1255,6 +1266,8 @@ export async function batchCreateSchedules(data: {
   end_time: string;
   days_of_week: number[];
   play_date?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
 }) {
   try {
     if (!data.screen_ids || data.screen_ids.length === 0) {
@@ -1264,10 +1277,10 @@ export async function batchCreateSchedules(data: {
     const created: unknown[] = [];
     for (const screenId of data.screen_ids) {
       const result = await sql`
-        INSERT INTO signage_schedules (screen_id, playlist_id, start_time, end_time, days_of_week, play_date)
+        INSERT INTO signage_schedules (screen_id, playlist_id, start_time, end_time, days_of_week, play_date, start_date, end_date)
         VALUES (${screenId}, ${data.playlist_id}, ${data.start_time}, ${data.end_time},
-                ${daysJson}, ${data.play_date || null})
-        RETURNING id, screen_id, playlist_id, start_time, end_time, days_of_week, play_date;
+                ${daysJson}, ${data.play_date || null}, ${data.start_date || null}, ${data.end_date || null})
+        RETURNING id, screen_id, playlist_id, start_time, end_time, days_of_week, play_date, start_date, end_date;
       `;
       created.push(result[0]);
     }

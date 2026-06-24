@@ -4,7 +4,8 @@
  *
  * 優先順序：
  *   1. 特定日期 (play_date = today) 的排程：優先級最高
- *   2. 週期性 (days_of_week 包含今日) 的排程
+ *   2. 日期區間 (start_date <= today <= end_date 且 today 的星期 ∈ days_of_week)
+ *   3. 週期性 (days_of_week 包含今日) 的排程
  *
  * 時間視窗：start_time <= 現在 <= end_time
  */
@@ -16,7 +17,9 @@ export interface ScheduleRow {
   start_time: string; // "HH:MM:SS"
   end_time: string; // "HH:MM:SS"
   days_of_week: string; // JSON 字串 "[1,2,3,4,5]"
-  play_date: string | null; // "YYYY-MM-DD" 或 null
+  play_date: string | null; // 特定單日 "YYYY-MM-DD" 或 null
+  start_date?: string | null; // 日期區間起 "YYYY-MM-DD" 或 null
+  end_date?: string | null; // 日期區間迄 "YYYY-MM-DD" 或 null
   playlist_name?: string;
   screen_name?: string;
 }
@@ -113,6 +116,19 @@ function toDateString(val: unknown): string | null {
 }
 
 /**
+ * 該排程的 days_of_week 是否包含指定星期
+ * days_of_week 為非法 JSON 時回傳 false
+ */
+function dayMatches(schedule: ScheduleRow, currentDay: number): boolean {
+  try {
+    const days = JSON.parse(schedule.days_of_week) as number[];
+    return Array.isArray(days) && days.includes(currentDay);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * 主匹配函式：從一組排程中挑出當前該播的那一筆
  * 找不到時回傳 null
  */
@@ -125,6 +141,7 @@ export function matchSchedule(
   const currentDay = getCurrentDayOfWeek(now);
 
   let candidateSpecific: ScheduleRow | null = null;
+  let candidateRange: ScheduleRow | null = null;
   let candidateRecurring: ScheduleRow | null = null;
 
   for (const schedule of schedules) {
@@ -146,18 +163,27 @@ export function matchSchedule(
       continue;
     }
 
-    // 2. 週期性排程：尚未鎖定才記錄
-    if (!candidateRecurring) {
-      try {
-        const days = JSON.parse(schedule.days_of_week) as number[];
-        if (Array.isArray(days) && days.includes(currentDay)) {
-          candidateRecurring = schedule;
-        }
-      } catch {
-        // days_of_week 非法 JSON，略過此排程
+    const startDate = toDateString(schedule.start_date);
+    const endDate = toDateString(schedule.end_date);
+
+    // 2. 日期區間排程：今天落在區間內、且星期符合（次高優先）
+    if (startDate && endDate) {
+      if (
+        !candidateRange &&
+        startDate <= currentDate &&
+        currentDate <= endDate &&
+        dayMatches(schedule, currentDay)
+      ) {
+        candidateRange = schedule;
       }
+      continue;
+    }
+
+    // 3. 週期性排程：尚未鎖定才記錄
+    if (!candidateRecurring && dayMatches(schedule, currentDay)) {
+      candidateRecurring = schedule;
     }
   }
 
-  return candidateSpecific ?? candidateRecurring;
+  return candidateSpecific ?? candidateRange ?? candidateRecurring;
 }

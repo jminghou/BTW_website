@@ -9,7 +9,7 @@ import { batchCreateSchedules } from '@/lib/signage/db';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { screen_ids, playlist_id, start_time, end_time, days_of_week, play_date } = body;
+    const { screen_ids, playlist_id, start_time, end_time, days_of_week, play_date, start_date, end_date } = body;
 
     if (!Array.isArray(screen_ids) || screen_ids.length === 0) {
       return NextResponse.json({ success: false, message: '請選擇至少一個螢幕' }, { status: 400 });
@@ -28,6 +28,8 @@ export async function POST(req: NextRequest) {
       end_time,
       days_of_week: days_of_week.map(Number),
       play_date: play_date || null,
+      start_date: start_date || null,
+      end_date: end_date || null,
     });
 
     if (result.success) {

@@ -13,7 +13,12 @@ interface Schedule {
   end_time: string;
   days_of_week: string;
   play_date: string | null;
+  start_date: string | null;
+  end_date: string | null;
 }
+
+/** 排程類型：每週循環 / 指定單日 / 日期區間 */
+type ScheduleMode = 'weekly' | 'single' | 'range';
 interface Screen { id: number; name: string }
 interface Playlist { id: number; name: string }
 
@@ -46,6 +51,8 @@ interface FormState {
   screen_id: string; playlist_id: string;
   start_time: string; end_time: string;
   days_of_week: number[]; play_date: string;
+  start_date: string; end_date: string;
+  mode: ScheduleMode;
 }
 
 export default function SiteSchedulesPage() {
@@ -67,7 +74,7 @@ export default function SiteSchedulesPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<FormState>({
     screen_id: '', playlist_id: '', start_time: '08:00', end_time: '18:00',
-    days_of_week: [1, 2, 3, 4, 5], play_date: '',
+    days_of_week: [1, 2, 3, 4, 5], play_date: '', start_date: '', end_date: '', mode: 'weekly',
   });
 
   // 某日詳情
@@ -142,11 +149,17 @@ export default function SiteSchedulesPage() {
   const schedulesForDate = (d: Date): Schedule[] => {
     const ds = toDateStr(d);
     const wd = isoWeekday(d);
+    const weekdayIncludes = (s: Schedule) => {
+      try { return (JSON.parse(s.days_of_week) as number[]).includes(wd); } catch { return false; }
+    };
     return schedules
       .filter(s => {
         const pd = s.play_date ? s.play_date.substring(0, 10) : null;
-        if (pd) return pd === ds;
-        try { return (JSON.parse(s.days_of_week) as number[]).includes(wd); } catch { return false; }
+        if (pd) return pd === ds; // 特定單日
+        const sd = s.start_date ? s.start_date.substring(0, 10) : null;
+        const ed = s.end_date ? s.end_date.substring(0, 10) : null;
+        if (sd && ed) return sd <= ds && ds <= ed && weekdayIncludes(s); // 日期區間（含星期過濾）
+        return weekdayIncludes(s); // 每週循環
       })
       .sort((a, b) => a.start_time.localeCompare(b.start_time));
   };
@@ -181,29 +194,54 @@ export default function SiteSchedulesPage() {
       start_time: '08:00', end_time: '18:00',
       days_of_week: prefillDate ? [isoWeekday(new Date(prefillDate))] : [1, 2, 3, 4, 5],
       play_date: prefillDate || '',
+      start_date: '', end_date: '',
+      mode: prefillDate ? 'single' : 'weekly', // 從月曆某日點「新增」→ 預設指定單日
     });
     setShowForm(true);
   };
   const openEdit = (s: Schedule) => {
     setEditing(s);
     const days = (() => { try { return JSON.parse(s.days_of_week) as number[]; } catch { return []; } })();
+    const sd = s.start_date ? s.start_date.substring(0, 10) : '';
+    const ed = s.end_date ? s.end_date.substring(0, 10) : '';
+    const mode: ScheduleMode = s.play_date ? 'single' : (sd && ed ? 'range' : 'weekly');
     setForm({
       screen_id: s.screen_id.toString(), playlist_id: s.playlist_id.toString(),
       start_time: s.start_time.substring(0, 5), end_time: s.end_time.substring(0, 5),
       days_of_week: days, play_date: s.play_date ? s.play_date.substring(0, 10) : '',
+      start_date: sd, end_date: ed, mode,
     });
     setShowForm(true);
   };
+  // 切換排程類型：切到「日期區間」時預設每天播放（全選星期），可再手動限縮
+  const setMode = (mode: ScheduleMode) => setForm(f => ({
+    ...f, mode,
+    days_of_week: mode === 'range'
+      ? [1, 2, 3, 4, 5, 6, 7]
+      : (f.days_of_week.length ? f.days_of_week : [1, 2, 3, 4, 5]),
+  }));
   const toggleDay = (d: number) => setForm(f => ({
     ...f, days_of_week: f.days_of_week.includes(d) ? f.days_of_week.filter(x => x !== d) : [...f.days_of_week, d].sort(),
   }));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // 依排程類型驗證
+    if (form.mode === 'single' && !form.play_date) { alert('請選擇指定日期'); return; }
+    if (form.mode === 'range') {
+      if (!form.start_date || !form.end_date) { alert('請選擇開始與結束日期'); return; }
+      if (form.start_date > form.end_date) { alert('結束日期不可早於開始日期'); return; }
+    }
+    if (form.mode !== 'single' && form.days_of_week.length === 0) { alert('請至少選擇一個星期'); return; }
+
     const payload = {
       screen_id: Number(form.screen_id), playlist_id: Number(form.playlist_id),
       start_time: form.start_time, end_time: form.end_time,
-      days_of_week: form.days_of_week, play_date: form.play_date || null,
+      days_of_week: form.days_of_week,
+      // 三種類型互斥：只送出該類型對應的日期欄位，其餘清成 null
+      play_date: form.mode === 'single' ? (form.play_date || null) : null,
+      start_date: form.mode === 'range' ? (form.start_date || null) : null,
+      end_date: form.mode === 'range' ? (form.end_date || null) : null,
     };
     const url = editing ? `/api/signage/schedules/${editing.id}` : '/api/signage/schedules';
     const res = await fetch(url, { method: editing ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
@@ -334,22 +372,73 @@ export default function SiteSchedulesPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500" />
                 </div>
               </div>
+              {/* 排程類型：每週循環 / 指定單日 / 日期區間 */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">星期幾</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">排程類型</label>
                 <div className="flex gap-2">
-                  {DAYS.map(d => (
-                    <button key={d.v} type="button" onClick={() => toggleDay(d.v)}
-                      className={`w-10 h-10 rounded-lg border ${form.days_of_week.includes(d.v) ? 'bg-cyan-600 text-white border-cyan-600' : 'bg-white text-gray-700 border-gray-300'}`}>
-                      {d.label}
+                  {([
+                    { v: 'weekly', label: '每週循環' },
+                    { v: 'single', label: '指定單日' },
+                    { v: 'range', label: '日期區間' },
+                  ] as { v: ScheduleMode; label: string }[]).map(opt => (
+                    <button key={opt.v} type="button" onClick={() => setMode(opt.v)}
+                      className={`flex-1 px-3 py-2 rounded-lg border text-sm font-medium ${form.mode === opt.v ? 'bg-cyan-600 text-white border-cyan-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}>
+                      {opt.label}
                     </button>
                   ))}
                 </div>
+                <p className="text-xs text-gray-400 mt-1">
+                  優先順序：指定單日 ＞ 日期區間 ＞ 每週循環（同一時段多筆排程時，較精準者優先）
+                </p>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">特定日期（選填，設定後優先於星期）</label>
-                <input type="date" value={form.play_date} onChange={e => setForm({ ...form, play_date: e.target.value })}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500" />
-              </div>
+
+              {/* 日期區間：開始 / 結束日期 */}
+              {form.mode === 'range' && (
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">開始日期 *</label>
+                    <input type="date" required value={form.start_date}
+                      onChange={e => setForm({ ...form, start_date: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">結束日期 *</label>
+                    <input type="date" required value={form.end_date} min={form.start_date || undefined}
+                      onChange={e => setForm({ ...form, end_date: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500" />
+                  </div>
+                </div>
+              )}
+
+              {/* 指定單日 */}
+              {form.mode === 'single' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">指定日期 *</label>
+                  <input type="date" required value={form.play_date}
+                    onChange={e => setForm({ ...form, play_date: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500" />
+                </div>
+              )}
+
+              {/* 星期幾：每週循環必選；日期區間作為區間內的選填過濾（預設每天） */}
+              {(form.mode === 'weekly' || form.mode === 'range') && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    星期幾
+                    {form.mode === 'range' && (
+                      <span className="text-gray-400 font-normal">（區間內要播放的星期，預設每天）</span>
+                    )}
+                  </label>
+                  <div className="flex gap-2">
+                    {DAYS.map(d => (
+                      <button key={d.v} type="button" onClick={() => toggleDay(d.v)}
+                        className={`w-10 h-10 rounded-lg border ${form.days_of_week.includes(d.v) ? 'bg-cyan-600 text-white border-cyan-600' : 'bg-white text-gray-700 border-gray-300'}`}>
+                        {d.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="flex gap-2">
                 <button type="submit" className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg text-sm font-medium">{editing ? '更新' : '建立'}</button>
                 <button type="button" onClick={() => setShowForm(false)} className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium">取消</button>
@@ -379,7 +468,14 @@ export default function SiteSchedulesPage() {
                         <span className={`text-xs px-2 py-0.5 rounded font-semibold ${st.cls}`}>{st.label}</span>
                         <div className="flex-1 min-w-0">
                           <div className="font-medium text-sm truncate">{s.playlist_name}</div>
-                          <div className="text-xs text-gray-500">{s.screen_name}｜{s.start_time.substring(0, 5)}–{s.end_time.substring(0, 5)}{s.play_date ? '' : '（每週）'}</div>
+                          <div className="text-xs text-gray-500">
+                            {s.screen_name}｜{s.start_time.substring(0, 5)}–{s.end_time.substring(0, 5)}
+                            {s.play_date
+                              ? ''
+                              : s.start_date && s.end_date
+                                ? `（${s.start_date.substring(0, 10)} ~ ${s.end_date.substring(0, 10)}）`
+                                : '（每週）'}
+                          </div>
                         </div>
                         <button onClick={() => openEdit(s)} className="text-cyan-600 hover:underline text-sm">編輯</button>
                         <button onClick={() => handleDelete(s.id)} className="text-red-600 hover:underline text-sm">刪除</button>

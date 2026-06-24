@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { screen_id, playlist_id, start_time, end_time, days_of_week, play_date } = body;
+    const { screen_id, playlist_id, start_time, end_time, days_of_week, play_date, start_date, end_date } = body;
     if (!screen_id || !playlist_id || !start_time || !end_time || !Array.isArray(days_of_week)) {
       return NextResponse.json({
         success: false,
@@ -32,6 +32,8 @@ export async function POST(req: NextRequest) {
       end_time,
       days_of_week: days_of_week.map(Number),
       play_date: play_date || null,
+      start_date: start_date || null,
+      end_date: end_date || null,
     });
     if (result.success) {
       return NextResponse.json({ success: true, data: result.data, message: '排程建立成功' }, { status: 201 });
