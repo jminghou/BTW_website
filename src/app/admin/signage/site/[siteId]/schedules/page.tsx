@@ -185,6 +185,35 @@ export default function SiteSchedulesPage() {
     }
   };
 
+  const handleDeduplicate = async () => {
+    if (!siteId) return;
+    const picked = (prompt('請輸入保留方式：latest（保留最新）或 oldest（保留最舊）', 'latest') || '').trim().toLowerCase();
+    if (!picked) return;
+    if (picked !== 'latest' && picked !== 'oldest') {
+      alert('請輸入 latest 或 oldest');
+      return;
+    }
+    const keepLabel = picked === 'latest' ? '最新' : '最舊';
+    if (!confirm(`將清理本廠區重複排程，並保留${keepLabel}一筆。確定執行嗎？`)) return;
+
+    setBusy(true);
+    setActionMsg('');
+    try {
+      const res = await fetch('/api/signage/schedules/deduplicate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ site_id: Number(siteId), keep: picked }),
+      });
+      const json = await res.json();
+      setActionMsg(json.message || (json.success ? '清理完成' : '清理失敗'));
+      if (json.success) await load();
+    } catch {
+      setActionMsg('網路錯誤');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   // ---- 新增/編輯 ----
   const openNew = (prefillDate?: string) => {
     setEditing(null);
@@ -272,6 +301,10 @@ export default function SiteSchedulesPage() {
           <button onClick={handleAutoGenerate} disabled={busy || screens.length === 0}
             className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium">
             一鍵列表轉排程
+          </button>
+          <button onClick={handleDeduplicate} disabled={busy}
+            className="bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium">
+            清理重複排程
           </button>
           <button onClick={openMealSlots}
             className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-medium">

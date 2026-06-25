@@ -909,10 +909,10 @@ export default function SiteAssetsPage() {
         <table className="w-full text-sm table-fixed">
           <colgroup>
             <col className="w-10" />        {/* 核取方塊 */}
-            <col />                          {/* 檔名（佔用剩餘寬度） */}
-            <col className="w-40" />        {/* 說明（縮窄） */}
-            <col className="w-28" />        {/* 上傳時間 */}
-            <col className="w-56" />        {/* 操作（拉寬，容納 4 個按鈕並排） */}
+            <col className="w-[28%]" />     {/* 檔名（縮短） */}
+            <col className="w-[42%]" />     {/* 說明（拉寬） */}
+            <col className="w-32" />        {/* 上傳時間 */}
+            <col className="w-52" />        {/* 操作 */}
           </colgroup>
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
@@ -948,10 +948,28 @@ export default function SiteAssetsPage() {
                   <input type="checkbox" checked={selectedIds.has(a.id)} onChange={() => {}}
                     onClick={e => selectRow(idx, a.id, e.shiftKey)} />
                 </td>
-                <td className="px-3 py-3 font-mono text-cyan-700 cursor-pointer select-none break-words align-top"
-                  onClick={e => selectRow(idx, a.id, e.shiftKey)}>{a.filename}</td>
-                <td className="px-3 py-3 text-gray-600 break-words align-top">{a.description || '—'}</td>
-                <td className="px-3 py-3 text-xs text-gray-400 break-words align-top">{new Date(a.upload_timestamp).toLocaleString('zh-TW')}</td>
+                <td
+                  className="px-3 py-3 font-mono text-cyan-700 cursor-pointer select-none align-top"
+                  onClick={e => selectRow(idx, a.id, e.shiftKey)}
+                  title={a.filename}
+                >
+                  <div className="break-all overflow-hidden [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] leading-5">
+                    {a.filename}
+                  </div>
+                </td>
+                <td className="px-3 py-3 text-gray-600 text-[11px] align-top" title={a.description || '—'}>
+                  <div className="break-all overflow-hidden [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] leading-4">
+                    {a.description || '—'}
+                  </div>
+                </td>
+                <td
+                  className="px-3 py-3 text-xs text-gray-400 align-top"
+                  title={new Date(a.upload_timestamp).toLocaleString('zh-TW')}
+                >
+                  <div className="break-words overflow-hidden [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] leading-4">
+                    {new Date(a.upload_timestamp).toLocaleString('zh-TW')}
+                  </div>
+                </td>
                 <td className="px-3 py-3 text-right whitespace-nowrap align-top">
                   <a href={assetProxyUrl(a.id, a.blob_url)} target="_blank" rel="noopener noreferrer" className="text-cyan-600 hover:underline mr-3">預覽</a>
                   <button onClick={() => openEdit(a)} className="text-amber-600 hover:underline mr-3">編輯</button>

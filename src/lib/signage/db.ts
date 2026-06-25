@@ -128,6 +128,15 @@ export async function createSignageTables() {
   }
 }
 
+/**
+ * 舊資料庫相容：確保日期區間欄位存在。
+ * 有些環境在新增 start_date/end_date 前就已建表，且未再次執行初始化。
+ */
+async function ensureScheduleDateColumns() {
+  await sql`ALTER TABLE signage_schedules ADD COLUMN IF NOT EXISTS start_date DATE;`;
+  await sql`ALTER TABLE signage_schedules ADD COLUMN IF NOT EXISTS end_date DATE;`;
+}
+
 // ==================== Regions ====================
 
 export async function getRegions() {
@@ -991,6 +1000,65 @@ function addOneDay(dateStr: string): string {
   return `${yy}-${mm}-${dd}`;
 }
 
+function toYmdInTaipei(date: Date): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Taipei',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const get = (type: string) => parts.find(p => p.type === type)?.value ?? '';
+  return `${get('year')}-${get('month')}-${get('day')}`;
+}
+
+/**
+ * 正規化 DB 讀出的日期，避免 DATE 在 JS 端受時區影響（例如 +8 變成前一天 UTC）。
+ */
+function normalizeDbDate(val: unknown): string | null {
+  if (val === null || val === undefined) return null;
+  if (typeof val === 'string') {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
+    const d = new Date(val);
+    if (!Number.isNaN(d.getTime())) return toYmdInTaipei(d);
+    return val.length >= 10 ? val.substring(0, 10) : val;
+  }
+  if (val instanceof Date) return toYmdInTaipei(val);
+  const s = String(val);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const d = new Date(s);
+  if (!Number.isNaN(d.getTime())) return toYmdInTaipei(d);
+  return s.length >= 10 ? s.substring(0, 10) : s;
+}
+
+/**
+ * 從檔名或清單名解析餐期與日期。
+ * 支援：
+ *  - F3_L_2026-06-24.html
+ *  - F3_L_2026-06-24_TV.html
+ *  - F3_午餐_2026-06-24.html
+ */
+function parseMealAndDate(raw: string): { mealKey: 'B' | 'L' | 'D' | 'N'; date: string } | null {
+  const text = String(raw || '').trim();
+  if (!text) return null;
+
+  // 先處理最常見格式：_B/L/D/N_YYYY-MM-DD（後方允許有尾碼）
+  const alpha = text.match(/(?:^|_)([BLDN])_(\d{4}-\d{2}-\d{2})(?:$|[_\-.])/i);
+  if (alpha) {
+    return { mealKey: alpha[1].toUpperCase() as 'B' | 'L' | 'D' | 'N', date: alpha[2] };
+  }
+
+  // 兼容中文餐期名稱
+  const zh = text.match(/(?:^|_)(早餐|午餐|晚餐|宵夜|早|午|晚|宵)_(\d{4}-\d{2}-\d{2})(?:$|[_\-.])/);
+  if (!zh) return null;
+  const label = zh[1];
+  const mealKey: 'B' | 'L' | 'D' | 'N' =
+    label === '早餐' || label === '早' ? 'B'
+      : label === '午餐' || label === '午' ? 'L'
+        : label === '晚餐' || label === '晚' ? 'D'
+          : 'N';
+  return { mealKey, date: zh[2] };
+}
+
 export async function autoGenerateSchedulesFromPlaylists(siteId: number) {
   try {
     // 該廠區所有螢幕
@@ -1009,15 +1077,21 @@ export async function autoGenerateSchedulesFromPlaylists(siteId: number) {
     for (const s of slotsResult.data) {
       if (s.enabled) slotSegments.set(s.meal_key, buildSegments(s.start_time, s.end_time));
     }
+    if (slotSegments.size === 0) {
+      return { success: false, error: '目前餐期排程全部停用，請先到「餐期排程」啟用至少一個餐期' };
+    }
 
     // 該廠區所有播放清單內的素材檔名
     const rows = await sql`
-      SELECT pi.playlist_id, a.filename
+      SELECT pi.playlist_id, a.filename, p.name AS playlist_name
       FROM signage_playlist_items pi
       JOIN signage_assets a ON pi.asset_id = a.id
       JOIN signage_playlists p ON pi.playlist_id = p.id
       WHERE p.site_id = ${siteId};
     `;
+    if (rows.length === 0) {
+      return { success: false, error: '此廠區播放清單尚未加入素材，無法自動產生排程' };
+    }
 
     // 該廠區既有排程（用於去重/補填）
     const existingRows = await sql`
@@ -1027,22 +1101,30 @@ export async function autoGenerateSchedulesFromPlaylists(siteId: number) {
       WHERE sc.site_id = ${siteId};
     `;
     const norm = (t: unknown) => String(t).substring(0, 8); // "HH:MM:SS"
-    const existingMap = new Map<string, { id: number; play_date: string | null }>();
+    const existingExact = new Set<string>();
+    const existingNullDate = new Map<string, number>();
     for (const e of existingRows as Array<{ id: number; screen_id: number; playlist_id: number; start_time: string; end_time: string; days_of_week: string; play_date: string | null }>) {
-      const key = `${e.screen_id}|${e.playlist_id}|${e.days_of_week}|${norm(e.start_time)}|${norm(e.end_time)}`;
-      existingMap.set(key, { id: e.id, play_date: e.play_date ? String(e.play_date).substring(0, 10) : null });
+      const baseKey = `${e.screen_id}|${e.playlist_id}|${e.days_of_week}|${norm(e.start_time)}|${norm(e.end_time)}`;
+      const normalizedPlayDate = normalizeDbDate(e.play_date);
+      if (normalizedPlayDate) {
+        existingExact.add(`${baseKey}|${normalizedPlayDate}`);
+      } else if (!existingNullDate.has(baseKey)) {
+        existingNullDate.set(baseKey, e.id);
+      }
     }
 
-    const pattern = /_([BLDN])_(\d{4}-\d{2}-\d{2})\.html$/i;
     let created = 0, updated = 0, skipped = 0;
+    let parseable = 0;
     const inserts: { screen_id: number; playlist_id: number; start: string; end: string; days: string; play_date: string }[] = [];
     const updates: { id: number; play_date: string }[] = [];
+    const plannedExact = new Set<string>(existingExact);
 
-    for (const row of rows as Array<{ playlist_id: number; filename: string }>) {
-      const match = row.filename.match(pattern);
-      if (!match) continue;
-      const slot = match[1].toUpperCase();
-      const baseDate = match[2];
+    for (const row of rows as Array<{ playlist_id: number; filename: string; playlist_name: string }>) {
+      const parsed = parseMealAndDate(row.filename) ?? parseMealAndDate(row.playlist_name);
+      if (!parsed) continue;
+      parseable++;
+      const slot = parsed.mealKey;
+      const baseDate = parsed.date;
       const segments = slotSegments.get(slot); // 只處理已啟用的餐期
       if (!segments) continue;
 
@@ -1050,26 +1132,33 @@ export async function autoGenerateSchedulesFromPlaylists(siteId: number) {
         const playDate = seg.nextDay ? addOneDay(baseDate) : baseDate;
         const daysJson = JSON.stringify([isoWeekdayLocal(playDate)]);
         for (const screenId of screenIds) {
-          const key = `${screenId}|${row.playlist_id}|${daysJson}|${seg.start}|${seg.end}`;
-          const existing = existingMap.get(key);
-          if (existing) {
-            if (existing.play_date === null) {
-              updates.push({ id: existing.id, play_date: playDate });
-              existing.play_date = playDate;
-              updated++;
-            } else if (existing.play_date === playDate) {
-              skipped++;
-            } else {
-              inserts.push({ screen_id: screenId, playlist_id: row.playlist_id, start: seg.start, end: seg.end, days: daysJson, play_date: playDate });
-              created++;
-            }
+          const baseKey = `${screenId}|${row.playlist_id}|${daysJson}|${seg.start}|${seg.end}`;
+          const exactKey = `${baseKey}|${playDate}`;
+          if (plannedExact.has(exactKey)) {
+            skipped++;
+            continue;
+          }
+
+          const nullDateId = existingNullDate.get(baseKey);
+          if (nullDateId) {
+            updates.push({ id: nullDateId, play_date: playDate });
+            existingNullDate.delete(baseKey);
+            plannedExact.add(exactKey);
+            updated++;
           } else {
             inserts.push({ screen_id: screenId, playlist_id: row.playlist_id, start: seg.start, end: seg.end, days: daysJson, play_date: playDate });
-            existingMap.set(key, { id: -1, play_date: playDate });
+            plannedExact.add(exactKey);
             created++;
           }
         }
       }
+    }
+
+    if (parseable === 0) {
+      return {
+        success: false,
+        error: '找不到可解析的餐期/日期格式。請確認檔名或清單名包含例如「F3_L_2026-06-24」',
+      };
     }
 
     // ===== 批次寫入（取代原本逐筆 await，避免上百次往返導致 Serverless 逾時）=====
@@ -1122,6 +1211,7 @@ export async function autoGenerateSchedulesFromPlaylists(siteId: number) {
 
 export async function getSchedules(screenId?: number) {
   try {
+    await ensureScheduleDateColumns();
     const result = screenId
       ? await sql`
           SELECT s.id, s.screen_id, s.playlist_id, s.start_time, s.end_time,
@@ -1151,6 +1241,7 @@ export async function getSchedules(screenId?: number) {
 
 export async function getSchedulesByScreenKey(uniqueKey: string) {
   try {
+    await ensureScheduleDateColumns();
     const result = await sql`
       SELECT s.id, s.screen_id, s.playlist_id, s.start_time, s.end_time,
              s.days_of_week, s.play_date, s.start_date, s.end_date,
@@ -1197,6 +1288,7 @@ export interface ScheduleInput {
 
 export async function createSchedule(data: ScheduleInput) {
   try {
+    await ensureScheduleDateColumns();
     const daysJson = JSON.stringify(data.days_of_week);
     const result = await sql`
       INSERT INTO signage_schedules (screen_id, playlist_id, start_time, end_time, days_of_week, play_date, start_date, end_date)
@@ -1213,6 +1305,7 @@ export async function createSchedule(data: ScheduleInput) {
 
 export async function updateSchedule(id: number, data: Partial<ScheduleInput>) {
   try {
+    await ensureScheduleDateColumns();
     const existing = await sql`SELECT id FROM signage_schedules WHERE id = ${id};`;
     if (existing.length === 0) {
       return { success: false, error: '找不到指定的排程' };
@@ -1256,6 +1349,67 @@ export async function deleteSchedule(id: number) {
 }
 
 /**
+ * 依廠區清理重複排程（一次性或日後手動執行皆可）
+ * 重複定義：排程關鍵欄位完全相同（含日期欄位）
+ * keep = 'latest' 時保留最新一筆；'oldest' 時保留最舊一筆。
+ */
+export async function deduplicateSchedulesBySite(
+  siteId: number,
+  keep: 'latest' | 'oldest' = 'latest',
+) {
+  try {
+    const orderBy = keep === 'oldest'
+      ? 's.created_at ASC NULLS LAST, s.id ASC'
+      : 's.created_at DESC NULLS LAST, s.id DESC';
+
+    const deletedRows = await sql.query(
+      `
+      WITH site_schedules AS (
+        SELECT s.*
+        FROM signage_schedules s
+        JOIN signage_screens sc ON sc.id = s.screen_id
+        WHERE sc.site_id = $1
+      ),
+      ranked AS (
+        SELECT
+          s.id,
+          ROW_NUMBER() OVER (
+            PARTITION BY
+              s.screen_id,
+              s.playlist_id,
+              s.start_time,
+              s.end_time,
+              s.days_of_week,
+              s.play_date,
+              s.start_date,
+              s.end_date
+            ORDER BY ${orderBy}
+          ) AS rn
+        FROM site_schedules s
+      )
+      DELETE FROM signage_schedules d
+      USING ranked r
+      WHERE d.id = r.id
+        AND r.rn > 1
+      RETURNING d.id;
+      `,
+      [siteId],
+    ) as Array<{ id: number }>;
+
+    return {
+      success: true,
+      data: {
+        deleted: deletedRows.length,
+        keep,
+      },
+    };
+  } catch (error) {
+    console.error('清理重複排程時發生錯誤：', error);
+    return { success: false, error };
+  }
+}
+
+/**
  * 批次建立排程：一份排程內容套用到多個螢幕
  * 對應 v2.0 的 /api/schedules/batch
  */
@@ -1270,6 +1424,7 @@ export async function batchCreateSchedules(data: {
   end_date?: string | null;
 }) {
   try {
+    await ensureScheduleDateColumns();
     if (!data.screen_ids || data.screen_ids.length === 0) {
       return { success: false, error: '未提供要套用的螢幕' };
     }
