@@ -482,6 +482,78 @@ export async function createAsset(data: {
   }
 }
 
+/**
+ * 以「同廠區 + 同檔名」覆蓋素材：
+ * - 若已存在同檔名素材：更新為新 blob_url/description/upload_timestamp（不新增新列）
+ * - 若不存在：建立新素材
+ * - 若歷史上已有多筆重複檔名：合併為單一素材，並把播放項目引用轉到保留那筆
+ */
+export async function upsertAssetByFilename(data: {
+  site_id: number | null;
+  filename: string;
+  blob_url: string;
+  description?: string;
+}) {
+  try {
+    const existing = await sql`
+      SELECT id, blob_url
+      FROM signage_assets
+      WHERE site_id IS NOT DISTINCT FROM ${data.site_id}
+        AND filename = ${data.filename}
+      ORDER BY upload_timestamp DESC, id DESC;
+    ` as Array<{ id: number; blob_url: string }>;
+
+    if (existing.length === 0) {
+      const inserted = await sql`
+        INSERT INTO signage_assets (site_id, filename, blob_url, description)
+        VALUES (${data.site_id}, ${data.filename}, ${data.blob_url}, ${data.description ?? null})
+        RETURNING id, site_id, filename, blob_url, description, upload_timestamp;
+      `;
+      return {
+        success: true as const,
+        data: inserted[0],
+        replaced_blob_urls: [] as string[],
+      };
+    }
+
+    const keep = existing[0];
+    const duplicated = existing.slice(1);
+    const duplicatedIds = duplicated.map(x => x.id);
+
+    // 舊資料可能已存在多筆同檔名，先把播放項目指向保留那筆，再清掉其餘重複列。
+    if (duplicatedIds.length > 0) {
+      await sql`
+        UPDATE signage_playlist_items
+        SET asset_id = ${keep.id}
+        WHERE asset_id = ANY(${duplicatedIds});
+      `;
+      await sql`
+        DELETE FROM signage_assets
+        WHERE id = ANY(${duplicatedIds});
+      `;
+    }
+
+    const updated = await sql`
+      UPDATE signage_assets
+      SET
+        blob_url = ${data.blob_url},
+        description = ${data.description ?? null},
+        upload_timestamp = CURRENT_TIMESTAMP
+      WHERE id = ${keep.id}
+      RETURNING id, site_id, filename, blob_url, description, upload_timestamp;
+    `;
+
+    return {
+      success: true as const,
+      data: updated[0],
+      replaced_blob_urls: [keep.blob_url, ...duplicated.map(x => x.blob_url)],
+    };
+  } catch (error) {
+    console.error('覆蓋素材時發生錯誤：', error);
+    return { success: false, error };
+  }
+}
+
 export async function updateAssetBlobUrl(id: number, blobUrl: string) {
   try {
     const result = await sql`

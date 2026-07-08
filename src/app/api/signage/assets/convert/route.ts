@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { uploadAsset } from '@/lib/signage/storage';
-import { createAsset, getSites } from '@/lib/signage/db';
+import { deleteAssetBlob, uploadAsset } from '@/lib/signage/storage';
+import { getSites, upsertAssetByFilename } from '@/lib/signage/db';
 import { templates, DEFAULT_TEMPLATE, type MealItem, type ConvertedMenu } from '@/lib/signage/templates';
 
 /** 一次最多同時進行的上傳數，避免一次打爆 Blob / Neon 連線 */
@@ -97,22 +97,38 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // 同一次轉檔若產生重複檔名，保留最後一份（新檔覆蓋舊檔）。
+    const dedupedTasks = Array.from(
+      tasks.reduce((acc, task) => {
+        acc.set(task.menu.filename, task);
+        return acc;
+      }, new Map<string, { menu: ConvertedMenu; sourceName: string }>()),
+    ).map(([, task]) => task);
+
     // ---- 第二階段（受限併發、平行）：上傳 Blob + 寫資料庫 ----
-    const outcomes = await mapWithConcurrency(tasks, UPLOAD_CONCURRENCY, async ({ menu, sourceName }) => {
+    const outcomes = await mapWithConcurrency(dedupedTasks, UPLOAD_CONCURRENCY, async ({ menu, sourceName }) => {
       const htmlBlob = new Blob([menu.html], { type: 'text/html; charset=utf-8' });
       const blobResult = await uploadAsset(site.code, menu.filename, htmlBlob);
       if (!blobResult.success) {
         return { ok: false as const, filename: menu.filename, error: '上傳到 Blob 失敗' };
       }
 
-      const dbResult = await createAsset({
+      const dbResult = await upsertAssetByFilename({
         site_id: siteId,
         filename: menu.filename,
         blob_url: blobResult.url,
         description: `由 ${sourceName} 自動轉檔（${menu.meta.location} ${menu.meta.mealTime} ${menu.meta.date}）`,
       });
       if (!dbResult.success) {
+        // DB 寫入失敗時回收新 Blob，避免孤兒檔。
+        await deleteAssetBlob(blobResult.url);
         return { ok: false as const, filename: menu.filename, error: '寫入資料庫失敗' };
+      }
+
+      // 同檔名覆蓋時，清掉舊 Blob（失敗不影響本次成功）。
+      const replacedBlobUrls = (dbResult as { replaced_blob_urls?: string[] }).replaced_blob_urls || [];
+      for (const oldUrl of replacedBlobUrls) {
+        if (oldUrl && oldUrl !== blobResult.url) await deleteAssetBlob(oldUrl);
       }
 
       return { ok: true as const, filename: menu.filename, warnings: menu.meta.warnings };

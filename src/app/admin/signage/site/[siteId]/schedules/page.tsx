@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
+import { assetProxyUrl } from '@/lib/signage/assetVersion';
 
 interface Schedule {
   id: number;
@@ -287,6 +288,38 @@ export default function SiteSchedulesPage() {
     else alert(json.message || '刪除失敗');
   };
 
+  const handlePreview = async (schedule: Schedule) => {
+    const previewWin = window.open('about:blank', '_blank');
+    if (!previewWin) {
+      alert('無法開啟預覽分頁，請確認瀏覽器允許彈出視窗。');
+      return;
+    }
+
+    previewWin.document.title = '載入預覽中...';
+    previewWin.document.body.innerHTML =
+      '<div style="font-family: sans-serif; padding: 16px; color: #4b5563;">載入預覽中...</div>';
+
+    try {
+      const res = await fetch(`/api/signage/playlists/${schedule.playlist_id}`);
+      const json = await res.json();
+      if (!json.success) {
+        throw new Error(json.message || '讀取播放清單失敗');
+      }
+
+      const items = (json.data?.items || []) as Array<{ asset_id?: number; blob_url?: string | null }>;
+      const firstAsset = items.find(it => Number.isFinite(it.asset_id));
+      if (!firstAsset?.asset_id) {
+        throw new Error('此排程對應的播放清單沒有素材可預覽');
+      }
+
+      previewWin.location.replace(assetProxyUrl(firstAsset.asset_id, firstAsset.blob_url));
+    } catch (error) {
+      previewWin.close();
+      const msg = error instanceof Error ? error.message : '開啟預覽失敗';
+      alert(msg);
+    }
+  };
+
   const monthLabel = `${cursor.getFullYear()}年 ${cursor.getMonth() + 1}月`;
   const noBase = (screens.length === 0 || playlists.length === 0) && !loading;
 
@@ -510,6 +543,7 @@ export default function SiteSchedulesPage() {
                                 : '（每週）'}
                           </div>
                         </div>
+                        <button onClick={() => handlePreview(s)} className="text-indigo-600 hover:underline text-sm">預覽</button>
                         <button onClick={() => openEdit(s)} className="text-cyan-600 hover:underline text-sm">編輯</button>
                         <button onClick={() => handleDelete(s.id)} className="text-red-600 hover:underline text-sm">刪除</button>
                       </div>

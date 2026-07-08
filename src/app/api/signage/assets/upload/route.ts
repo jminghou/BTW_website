@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { uploadAsset } from '@/lib/signage/storage';
-import { createAsset, getSites } from '@/lib/signage/db';
+import { deleteAssetBlob, uploadAsset } from '@/lib/signage/storage';
+import { getSites, upsertAssetByFilename } from '@/lib/signage/db';
 
 /**
  * 上傳素材
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
-      const dbResult = await createAsset({
+      const dbResult = await upsertAssetByFilename({
         site_id: siteId,
         filename: file.name,
         blob_url: blobResult.url,
@@ -65,8 +65,16 @@ export async function POST(req: NextRequest) {
       });
 
       if (!dbResult.success) {
+        // DB 寫入失敗時回收剛上傳的新 Blob，避免孤兒檔。
+        await deleteAssetBlob(blobResult.url);
         failed.push({ filename: file.name, error: '寫入資料庫失敗' });
         continue;
+      }
+
+      // 同檔名覆蓋時，刪除舊 Blob（失敗不影響本次上傳成功）。
+      const replacedBlobUrls = (dbResult as { replaced_blob_urls?: string[] }).replaced_blob_urls || [];
+      for (const oldUrl of replacedBlobUrls) {
+        if (oldUrl && oldUrl !== blobResult.url) await deleteAssetBlob(oldUrl);
       }
 
       uploaded.push(dbResult.data);
