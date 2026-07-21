@@ -41,6 +41,18 @@ export default function SitesPage() {
 
   useEffect(() => { load(); }, []);
 
+  useEffect(() => {
+    if (regions.length === 0 || typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('new') !== '1') return;
+
+    setEditing(null);
+    setForm({ region_id: regions[0].id.toString(), name: '', code: '', description: '' });
+    setShowForm(true);
+    setError('');
+    window.history.replaceState(null, '', window.location.pathname);
+  }, [regions]);
+
   const openNew = () => {
     setEditing(null);
     setForm({ region_id: regions[0]?.id?.toString() || '', name: '', code: '', description: '' });
