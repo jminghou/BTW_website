@@ -30,7 +30,7 @@ const SiteFooter = () => {
                 <p>電話：(02)2522-1167</p>
                 <p>客服信箱：service@haohuagroup.com.tw</p>
                 <p>地址：臺北市大同區太原路100號3樓</p>
-                <p>3 F., No. 154-1, Taiyuan Rd., Datong Dist., Taipei City 103020, Taiwan (R.O.C.)</p>
+                <p>3F., No. 100, Taiyuan Rd., Datong Dist., Taipei City 103020, Taiwan (R.O.C.)</p>
               </div>
             </div>
           </div>

@@ -51,7 +51,10 @@ export async function POST(request: NextRequest) {
         // 準備郵件內容
         const mailOptions = {
           from: process.env.SMTP_FROM || `"官網聯絡表單" <${process.env.SMTP_USER}>`,
-          to: 'service@haohuagroup.com.tw', // 寄給客服
+          to: [
+            'zoe.lee@haohuagroup.com.tw',
+            'jermaine.hou@haohuagroup.com.tw'
+          ], // 寄給聯絡表單負責人
           replyTo: user_email, // 設定回信地址為訪客信箱
           subject: `【官網聯絡通知】${user_name} - ${title}`,
           html: `

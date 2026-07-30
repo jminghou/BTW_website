@@ -222,9 +222,6 @@ const Contact = () => {
             {isSubmitting ? '提交中...' : '送出'}
           </button>
         </form>
-        <div className="mt-6 text-center text-gray-600">
-          <p>或者您可以直接發送郵件至：<a href="mailto:service@haohuagroup.com.tw" className="text-[#00bed6] hover:underline">service@haohuagroup.com.tw</a></p>
-        </div>
       </div>
     </div>
   )
