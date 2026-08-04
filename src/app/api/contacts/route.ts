@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
             'jermaine.hou@haohuagroup.com.tw'
           ], // 寄給聯絡表單負責人
           replyTo: user_email, // 設定回信地址為訪客信箱
-          subject: `【官網聯絡通知】${user_name} - ${title}`,
+          subject: `${identity}_${title}_${user_name}`,
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 5px;">
               <h2 style="color: #00bed6;">收到新的聯絡表單</h2>

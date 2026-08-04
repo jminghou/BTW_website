@@ -1,5 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAssetById } from '@/lib/signage/db';
+import { cachedSignageRead } from '@/lib/signage/cache';
+
+/**
+ * 素材的 blob 位址：走 Data Cache，寫入素材時自動失效。
+ * 這支路由在播放熱路徑上（每個 iframe 載入都會打），原本每次都查一次 DB。
+ * 回傳 null 代表確實查無此素材（穩定結果可快取）；連線失敗則丟出錯誤不快取。
+ */
+function loadAssetBlobUrl(id: number) {
+  return cachedSignageRead(['asset-blob-url', String(id)], async () => {
+    const result = await getAssetById(id);
+    if (result.success && result.data) {
+      return (result.data as unknown as { blob_url: string }).blob_url;
+    }
+    if (result.error === '找不到指定的素材') return null;
+    throw new Error('讀取素材失敗');
+  });
+}
 
 function injectReadyHandshakeScript(html: string): string {
   const prelude = `
@@ -115,14 +132,12 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   // 若無版本碼（少數素材 blob 路徑無時間戳），退回短快取以免鎖住舊內容。
   const hasVersion = req.nextUrl.searchParams.has('v');
 
-  const result = await getAssetById(id);
-  if (!result.success || !result.data) {
-    return new NextResponse('Asset not found', { status: 404 });
-  }
-
-  const blobUrl = (result.data as { blob_url: string }).blob_url;
-
   try {
+    const blobUrl = await loadAssetBlobUrl(id);
+    if (!blobUrl) {
+      return new NextResponse('Asset not found', { status: 404 });
+    }
+
     const blobRes = await fetch(blobUrl);
     if (!blobRes.ok) {
       return new NextResponse(`Failed to fetch from Blob (${blobRes.status})`, { status: 502 });

@@ -6,22 +6,72 @@ import {
 } from '@/lib/signage/db';
 import { matchSchedule, type ScheduleRow } from '@/lib/signage/schedule';
 import { assetProxyUrl } from '@/lib/signage/assetVersion';
+import { cachedSignageRead } from '@/lib/signage/cache';
 
 /**
- * 強制每次請求都即時查資料庫，不走 Next.js 的 Data Cache。
+ * 這支路由必須每次請求都真的執行（排程比對相依於「現在幾點」，不能整包快取回應）。
+ * 但「執行」不等於「查 DB」：下方三筆讀取都走 cachedSignageRead，
+ * 平常命中 Data Cache 完全不碰資料庫，後台一寫入就自動失效。
  *
- * 為什麼必要：
- *   GET Route Handler 內的 DB 讀取預設會被 Next.js 快取，且不會自動失效。
- *   曾發生「播放清單已改成 2 個項目，但播放器一直讀到 playlist 建立當下的
- *   舊狀態（1 個項目、180 秒）」→ 螢幕只播第一頁。
- *   標記 force-dynamic + revalidate=0 可關閉框架層快取，確保排程/清單即時生效。
- *
- *   注意：下方仍對「回應本身」設 Cache-Control s-maxage=180，
- *   那是 CDN 邊緣快取（最多延遲 3 分鐘，刻意拉長以減少 Neon compute 被喚醒的次數），
- *   與這裡關閉的「資料讀取快取」是不同層級，兩者並存沒有衝突。
+ * 歷史說明：
+ *   這裡原本用 force-dynamic 關掉框架快取，是為了修「播放清單改了但播放器
+ *   讀到舊快照」的 bug——但那等於連同省錢的快取一起關掉，再靠 CDN 的
+ *   s-maxage=180 補救。結果是每 3 分鐘一定回源查一次 DB，而 Neon 要閒置
+ *   滿 5 分鐘才休眠 → 只要有螢幕開著 compute 就永遠醒著（帳單來源）。
+ *   正解是「快取 + 寫入時 tag 失效」，既不會讀到舊資料、又不用一直查 DB，
+ *   而且排程改動比原本的 3 分鐘更快生效。
  */
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+interface ScreenRow {
+  id: number;
+  name: string;
+}
+
+/** 螢幕基本資料：查無此螢幕是穩定結果可快取，連線失敗則丟出錯誤不快取 */
+function loadScreen(key: string) {
+  return cachedSignageRead(['screen', key], async () => {
+    const result = await getScreenByKey(key);
+    if (result.success && result.data) return result.data as unknown as ScreenRow;
+    if (result.error === '找不到指定的螢幕') return null;
+    throw new Error('讀取螢幕資料失敗');
+  });
+}
+
+function loadSchedules(key: string) {
+  return cachedSignageRead(['schedules', key], async () => {
+    const result = await getSchedulesByScreenKey(key);
+    if (!result.success) throw new Error('取得排程失敗');
+    return (result.data as unknown as ScheduleRow[]) ?? [];
+  });
+}
+
+interface RawPlaylistItem {
+  asset_id: number;
+  filename: string;
+  blob_url: string;
+  duration_seconds: number;
+  description: string | null;
+}
+
+function loadPlaylistItems(playlistId: number) {
+  return cachedSignageRead(['playlist-items', String(playlistId)], async () => {
+    const result = await getPlaylistItemsByPlaylistId(playlistId);
+    if (!result.success) throw new Error('取得播放清單項目失敗');
+    return (result.data as unknown as RawPlaylistItem[]) ?? [];
+  });
+}
+
+/**
+ * 刻意不做 CDN 快取。
+ *
+ * 省 DB 的工作已經由 Data Cache 接手（輪詢命中時 0 次查詢），
+ * 這裡再加 s-maxage 只會有壞處：手動設定的 Cache-Control 會在 CDN 產生
+ * 一個 revalidateTag purge 不到的快取條目，讓後台改好的排程被卡住到期為止。
+ * 拿掉之後，排程改動在下一次輪詢（最慢 60 秒）就會上螢幕。
+ */
+const NO_STORE = { 'Cache-Control': 'no-store' } as const;
 
 /**
  * 播放器核心 API
@@ -29,9 +79,6 @@ export const revalidate = 0;
  *
  * 對應 v2.0 backend/api/player.py:get_current_schedule
  * 由螢幕端定期輪詢，回傳當前該播放的清單
- *
- * 加 Cache-Control: max-age=180 讓 Vercel Edge 可快取 3 分鐘
- * → 每個螢幕約每 3 分鐘才真正打一次 DB，讓 compute 能 auto-suspend 省運算時數
  */
 export async function GET(
   req: NextRequest,
@@ -47,27 +94,19 @@ export async function GET(
   }
 
   try {
-    // 1. 找螢幕
-    const screenResult = await getScreenByKey(key);
-    if (!screenResult.success || !screenResult.data) {
+    // 1. 找螢幕（與排程互不相依，同時發出）
+    const [screen, schedules] = await Promise.all([
+      loadScreen(key),
+      loadSchedules(key),
+    ]);
+    if (!screen) {
       return NextResponse.json({
         status: 'error',
         message: '找不到對應的螢幕',
       }, { status: 404 });
     }
-    const screen = screenResult.data as { id: number; name: string };
 
-    // 2. 取該螢幕所有排程
-    const schedulesResult = await getSchedulesByScreenKey(key);
-    if (!schedulesResult.success) {
-      return NextResponse.json({
-        status: 'error',
-        message: '取得排程失敗',
-      }, { status: 500 });
-    }
-    const schedules = (schedulesResult.data as unknown as ScheduleRow[]) ?? [];
-
-    // 3. 匹配當前排程
+    // 2. 匹配當前排程（相依於「現在幾點」，所以每次請求都要重算，不能快取結果）
     const matched = matchSchedule(schedules);
     if (!matched) {
       return NextResponse.json({
@@ -76,26 +115,11 @@ export async function GET(
         items: [],
         screen_name: screen.name,
         current_time: new Date().toISOString(),
-      }, {
-        headers: { 'Cache-Control': 'public, max-age=180, s-maxage=180' },
-      });
+      }, { headers: NO_STORE });
     }
 
-    // 4. 取出該排程對應的播放清單項目
-    const itemsResult = await getPlaylistItemsByPlaylistId(matched.playlist_id);
-    if (!itemsResult.success) {
-      return NextResponse.json({
-        status: 'error',
-        message: '取得播放清單項目失敗',
-      }, { status: 500 });
-    }
-    const rawItems = (itemsResult.data as unknown as Array<{
-      asset_id: number;
-      filename: string;
-      blob_url: string;
-      duration_seconds: number;
-      description: string | null;
-    }>) ?? [];
+    // 3. 取出該排程對應的播放清單項目
+    const rawItems = await loadPlaylistItems(matched.playlist_id);
 
     // 透過 proxy 路由提供 .html，避免 Vercel Blob 的 attachment disposition
     // 讓 iframe 能正常嵌入渲染（而非觸發下載）。
@@ -116,9 +140,7 @@ export async function GET(
       items,
       screen_name: screen.name,
       current_time: new Date().toISOString(),
-    }, {
-      headers: { 'Cache-Control': 'public, max-age=180, s-maxage=180' },
-    });
+    }, { headers: NO_STORE });
   } catch (error) {
     console.error('播放器 API 錯誤：', error);
     return NextResponse.json({

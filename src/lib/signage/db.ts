@@ -1,5 +1,6 @@
 import { neon } from '@neondatabase/serverless';
 import { randomUUID } from 'crypto';
+import { revalidateSignage } from './cache';
 
 /**
  * 數位看版系統資料庫工具
@@ -11,8 +12,54 @@ import { randomUUID } from 'crypto';
 // 否則 GET Route Handler 內的 DB 讀取會被框架快取且不自動失效，造成後台清單
 // 被凍結在舊快照（曾出現：播放清單只剩 20 筆、排程列表顯示 0 筆、播放器讀到舊內容）。
 // 這是讓所有 signage 查詢都即時反映資料庫的單點修正。
-const sql = neon(process.env.DATABASE_URL!, {
+//
+// 播放端的省流量快取走另一層（src/lib/signage/cache.ts 的 Data Cache + tag 失效），
+// 與這裡的設定不衝突：這裡保證「有查就是查到最新的」，那裡決定「要不要查」。
+const rawSql = neon(process.env.DATABASE_URL!, {
   fetchOptions: { cache: 'no-store' },
+});
+
+/**
+ * 判斷一段 SQL 是不是寫入。
+ * 刻意寫得精確一點，避免 SELECT 裡出現 update/delete 字樣就誤判
+ * （誤判只會多失效一次快取，不影響正確性，但沒必要）。
+ * 注意 DDL（ALTER/CREATE）刻意不算寫入：相容性 migration 會在讀取路徑上跑，
+ * 若也觸發失效會變成「讀取 → 失效 → 再讀取」的無窮迴圈。
+ */
+const MUTATION_PATTERN = /(INSERT\s+INTO|UPDATE\s+["a-z_]|DELETE\s+FROM)/i;
+
+/** 寫入成功後才讓看版讀取快取失效；失敗就不動快取。 */
+function tapMutation<T>(result: T, queryText: string): T {
+  if (!MUTATION_PATTERN.test(queryText)) return result;
+  return (result as unknown as Promise<unknown>).then(value => {
+    revalidateSignage();
+    return value;
+  }) as unknown as T;
+}
+
+/**
+ * sql 的包裝層：所有寫入自動讓播放端快取失效。
+ *
+ * 為什麼包在這一層而不是在每支 API 路由手動呼叫：
+ *   看版有 25 支以上會寫資料的路由，漏掉任何一支就會讓門市螢幕顯示舊菜單，
+ *   而且是「不會報錯」的那種錯。包在唯一的 DB 出口才能結構性保證不漏。
+ *
+ * 限制：neon 的 sql.transaction() 需要「尚未執行」的 NeonQueryPromise，
+ * 這裡的 .then() 會提早觸發查詢。目前 db.ts 沒有使用 transaction()；
+ * 未來若要用，請改用 rawSql 並在交易結束後自行呼叫 revalidateSignage()。
+ */
+const sql = new Proxy(rawSql, {
+  apply(target, thisArg, argArray) {
+    const [strings] = argArray as [TemplateStringsArray];
+    const queryText = Array.isArray(strings) ? strings.join(' ') : String(strings);
+    return tapMutation(Reflect.apply(target, thisArg, argArray), queryText);
+  },
+  get(target, prop, receiver) {
+    const value = Reflect.get(target, prop, receiver);
+    if (prop !== 'query' || typeof value !== 'function') return value;
+    return (text: string, ...rest: unknown[]) =>
+      tapMutation((value as (...a: unknown[]) => unknown).call(target, text, ...rest), text);
+  },
 });
 
 // ==================== 初始化 ====================
@@ -131,10 +178,24 @@ export async function createSignageTables() {
 /**
  * 舊資料庫相容：確保日期區間欄位存在。
  * 有些環境在新增 start_date/end_date 前就已建表，且未再次執行初始化。
+ *
+ * 用 promise 記憶化成「每個執行實例只跑一次」：
+ * 原本每次讀排程都會送兩趟 ALTER，等於播放端每分鐘輪詢都多打兩次 DB
+ * ——這些 DDL 本身就足以讓 Neon compute 一直醒著。
  */
+let scheduleDateColumnsReady: Promise<void> | null = null;
+
 async function ensureScheduleDateColumns() {
-  await sql`ALTER TABLE signage_schedules ADD COLUMN IF NOT EXISTS start_date DATE;`;
-  await sql`ALTER TABLE signage_schedules ADD COLUMN IF NOT EXISTS end_date DATE;`;
+  if (!scheduleDateColumnsReady) {
+    scheduleDateColumnsReady = (async () => {
+      await sql`ALTER TABLE signage_schedules ADD COLUMN IF NOT EXISTS start_date DATE;`;
+      await sql`ALTER TABLE signage_schedules ADD COLUMN IF NOT EXISTS end_date DATE;`;
+    })().catch(error => {
+      scheduleDateColumnsReady = null; // 失敗不要記住，下次還能重試
+      throw error;
+    });
+  }
+  return scheduleDateColumnsReady;
 }
 
 // ==================== Regions ====================
