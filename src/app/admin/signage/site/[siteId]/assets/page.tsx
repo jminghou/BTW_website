@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { assetProxyUrl } from '@/lib/signage/assetVersion';
-import { matchFilename } from '@/lib/signage/filenameFilter';
+import { extractFilenameDate, matchFilename } from '@/lib/signage/filenameFilter';
 
 interface Asset {
   id: number;
@@ -297,6 +297,11 @@ export default function SiteAssetsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   // 檔名快速篩選關鍵字（依檔名命名邏輯：廠區_餐期_年份-月份-日期）
   const [filterText, setFilterText] = useState('');
+  // 管理素材：依檔名中的日期區間批次刪除
+  const [manageStartDate, setManageStartDate] = useState('');
+  const [manageEndDate, setManageEndDate] = useState('');
+  const [managingDelete, setManagingDelete] = useState(false);
+  const [manageMessage, setManageMessage] = useState('');
   // 檔名排序方向：null＝維持原順序（上傳時間）／asc 升冪／desc 降冪
   const [filenameSort, setFilenameSort] = useState<'asc' | 'desc' | null>(null);
   // 記住上一次點選的列索引，作為 Shift 範圍選取的錨點
@@ -405,6 +410,15 @@ export default function SiteAssetsPage() {
         return filenameSort === 'asc' ? r : -r;
       })
     : filteredAssets;
+  const manageRangeInvalid = Boolean(
+    manageStartDate && manageEndDate && manageStartDate > manageEndDate,
+  );
+  const assetsInManageRange = manageStartDate && manageEndDate && !manageRangeInvalid
+    ? assets.filter(a => {
+        const date = extractFilenameDate(a.filename);
+        return date !== null && date >= manageStartDate && date <= manageEndDate;
+      })
+    : [];
   const allFilteredSelected = displayAssets.length > 0 && displayAssets.every(a => selectedIds.has(a.id));
   // 點檔名標題循環切換：原順序 → 升冪 → 降冪 → 原順序
   const toggleFilenameSort = () =>
@@ -669,6 +683,44 @@ export default function SiteAssetsPage() {
     const json = await res.json();
     if (json.success) await load();
     else alert(json.message || '批次刪除失敗');
+  };
+
+  const handleDeleteByDateRange = async () => {
+    if (
+      !manageStartDate ||
+      !manageEndDate ||
+      manageRangeInvalid ||
+      assetsInManageRange.length === 0 ||
+      managingDelete
+    ) return;
+
+    const targetIds = assetsInManageRange.map(asset => asset.id);
+    const rangeLabel = `${manageStartDate} 至 ${manageEndDate}`;
+    if (!confirm(
+      `確定要刪除 ${rangeLabel} 的全部素材嗎？\n\n共 ${targetIds.length} 個素材，此操作無法復原。`,
+    )) return;
+
+    setManagingDelete(true);
+    setManageMessage('刪除中...');
+    try {
+      const res = await fetch('/api/signage/assets/batch-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: targetIds }),
+      });
+      const json = await res.json();
+      if (!json.success) {
+        setManageMessage(`❌ ${json.message || '刪除失敗'}`);
+        return;
+      }
+
+      setManageMessage(`✅ 已刪除 ${rangeLabel} 的 ${targetIds.length} 個素材`);
+      await load();
+    } catch {
+      setManageMessage('❌ 刪除失敗：網路錯誤');
+    } finally {
+      setManagingDelete(false);
+    }
   };
 
   // 轉檔（瀏覽器螢幕快照）：把素材 HTML 截成 PNG 後直接下載
@@ -983,6 +1035,63 @@ export default function SiteAssetsPage() {
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* 管理素材 */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <h2 className="text-lg font-semibold mb-2">管理素材</h2>
+        <p className="text-sm text-gray-500 mb-5">
+          選擇素材日期區間後，可一次刪除區間內的全部素材。日期依檔名中的 YYYY-MM-DD 判定，並包含起訖日。
+        </p>
+
+        <div className="flex flex-col md:flex-row md:items-end gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">開始日期</label>
+            <input
+              type="date"
+              value={manageStartDate}
+              onChange={e => {
+                setManageStartDate(e.target.value);
+                setManageMessage('');
+              }}
+              className="w-full md:w-52 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">結束日期</label>
+            <input
+              type="date"
+              value={manageEndDate}
+              onChange={e => {
+                setManageEndDate(e.target.value);
+                setManageMessage('');
+              }}
+              className="w-full md:w-52 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={handleDeleteByDateRange}
+            disabled={
+              !manageStartDate ||
+              !manageEndDate ||
+              manageRangeInvalid ||
+              assetsInManageRange.length === 0 ||
+              managingDelete
+            }
+            className="bg-red-600 hover:bg-red-700 disabled:opacity-30 text-white px-4 py-2 rounded-lg text-sm font-medium"
+          >
+            {managingDelete ? '刪除中...' : `刪除此區間素材 (${assetsInManageRange.length})`}
+          </button>
+        </div>
+
+        {manageRangeInvalid && (
+          <p className="mt-3 text-sm text-red-600">結束日期不可早於開始日期。</p>
+        )}
+        {!manageRangeInvalid && manageStartDate && manageEndDate && assetsInManageRange.length === 0 && (
+          <p className="mt-3 text-sm text-gray-500">此日期區間沒有可刪除的素材。</p>
+        )}
+        {manageMessage && <p className="mt-3 text-sm font-medium">{manageMessage}</p>}
       </div>
 
       {/* 編輯 HTML 跳出視窗 */}

@@ -103,6 +103,31 @@ export default function SitePlaylistsPage() {
     }
   };
 
+  // ---- 刪除失聯列表 ----
+  const handleDeleteDisconnected = async () => {
+    if (!siteId || busy) return;
+    if (!confirm(
+      '將刪除本廠區內已沒有任何有效素材的播放列表，相關排程也會一併刪除。確定執行嗎？',
+    )) return;
+
+    setBusy(true);
+    setActionMsg('');
+    try {
+      const res = await fetch('/api/signage/playlists/delete-disconnected', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ site_id: Number(siteId) }),
+      });
+      const json = await res.json();
+      setActionMsg(json.message || (json.success ? '清理完成' : '清理失敗'));
+      if (json.success) await load();
+    } catch {
+      setActionMsg('網路錯誤');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   // 套用名稱篩選後的清單；選取、全選、Shift 範圍選取皆以此為準
   const filteredPlaylists = playlists.filter(p => matchFilename(p.name, filterText));
   const allFilteredSelected = filteredPlaylists.length > 0 && filteredPlaylists.every(p => selectedIds.has(p.id));
@@ -335,6 +360,10 @@ export default function SitePlaylistsPage() {
         </button>
         <button onClick={handleAutoCreate} disabled={busy} className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium">
           一鍵素材轉列表
+        </button>
+        <button onClick={handleDeleteDisconnected} disabled={busy}
+          className="bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium">
+          刪除失聯列表
         </button>
         <button onClick={allSelected ? deselectAll : selectAll} className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-medium">
           {allSelected ? '取消全選' : '全選'}

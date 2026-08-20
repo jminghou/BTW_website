@@ -27,8 +27,31 @@ export function matchFilename(filename: string, query: string): boolean {
   });
 }
 
-/** 從檔名取出日期欄位的「日（DD）」；命名邏輯為 年份-月份-日期（YYYY-MM-DD）。取不到回傳 null。 */
+/**
+ * 從檔名取出完整日期（YYYY-MM-DD）。
+ * 會驗證日期是否真實存在，取不到或日期無效時回傳 null。
+ */
+export function extractFilenameDate(name: string): string | null {
+  const m = name.match(/(?:^|[^0-9])(\d{4})-(\d{1,2})-(\d{1,2})(?=$|[^0-9])/);
+  if (!m) return null;
+
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  const day = Number(m[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return null;
+  }
+
+  return `${m[1]}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+/** 從檔名取出日期欄位的「日（DD）」；取不到回傳 null。 */
 function extractDay(name: string): number | null {
-  const m = name.match(/\b\d{4}-\d{1,2}-(\d{1,2})\b/);
-  return m ? parseInt(m[1], 10) : null;
+  const date = extractFilenameDate(name);
+  return date ? Number(date.slice(-2)) : null;
 }

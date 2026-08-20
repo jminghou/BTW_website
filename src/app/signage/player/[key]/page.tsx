@@ -21,7 +21,7 @@ interface PlayerResponse {
   current_time?: string;
 }
 
-const POLL_INTERVAL_MS = 60_000; // 每分鐘輪詢一次（命中邊緣快取不會打 DB，故不增加成本；確保 3 分鐘快取過期後螢幕能盡快抓到新內容）
+const POLL_INTERVAL_MS = 15_000; // 每 15 秒輪詢一次；命中 Data Cache 不打 DB，畫面最慢約 15 秒更新
 const FADE_DURATION_MS = 1500;
 const READY_SETTLE_MS = 150; // iframe onLoad 後稍等首屏穩定再淡入，降低閃爍感
 const READY_FALLBACK_MS = 1600; // 若素材未送 ready 訊號，超時後仍執行切換

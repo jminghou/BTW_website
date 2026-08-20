@@ -35,6 +35,34 @@ function toDateStr(d: Date): string {
   const dd = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${dd}`;
 }
+
+/** 將 API 回傳的 DATE/ISO 日期統一轉成台灣日期，避免 UTC 序列化後顯示成前一天。 */
+function toTaipeiDateStr(value: string | null): string | null {
+  if (!value) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value.substring(0, 10);
+
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Taipei',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const get = (type: string) => parts.find(part => part.type === type)?.value ?? '';
+  return `${get('year')}-${get('month')}-${get('day')}`;
+}
+
+function normalizeScheduleDates(schedule: Schedule): Schedule {
+  return {
+    ...schedule,
+    play_date: toTaipeiDateStr(schedule.play_date),
+    start_date: toTaipeiDateStr(schedule.start_date),
+    end_date: toTaipeiDateStr(schedule.end_date),
+  };
+}
+
 function isoWeekday(d: Date): number {
   return ((d.getDay() + 6) % 7) + 1;
 }
@@ -125,7 +153,11 @@ export default function SiteSchedulesPage() {
       setScreens(siteScreens);
       if (p.success) setPlaylists(p.data || []);
       const ids = new Set(siteScreens.map(s => s.id));
-      setSchedules((allSched.success ? allSched.data || [] : []).filter((s: Schedule) => ids.has(s.screen_id)));
+      setSchedules(
+        (allSched.success ? allSched.data || [] : [])
+          .filter((s: Schedule) => ids.has(s.screen_id))
+          .map(normalizeScheduleDates),
+      );
     } finally {
       setLoading(false);
     }

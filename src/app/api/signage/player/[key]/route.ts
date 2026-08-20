@@ -6,7 +6,7 @@ import {
 } from '@/lib/signage/db';
 import { matchSchedule, type ScheduleRow } from '@/lib/signage/schedule';
 import { assetProxyUrl } from '@/lib/signage/assetVersion';
-import { cachedSignageRead } from '@/lib/signage/cache';
+import { cachedSignageRead, revalidateSignage } from '@/lib/signage/cache';
 
 /**
  * 這支路由必須每次請求都真的執行（排程比對相依於「現在幾點」，不能整包快取回應）。
@@ -119,7 +119,17 @@ export async function GET(
     }
 
     // 3. 取出該排程對應的播放清單項目
-    const rawItems = await loadPlaylistItems(matched.playlist_id);
+    let rawItems = await loadPlaylistItems(matched.playlist_id);
+    // 播放端快取不會自動到期。若清單曾以「空陣列」被快住（例如素材是之後才加進去、
+    // 或寫入發生在別的部署而沒打到這台的 tag 失效），這裡補一次直讀 DB。
+    // 只有真的讀到內容才整組失效，避免「本來就沒素材」的排程每分鐘打爆快取。
+    if (rawItems.length === 0) {
+      const fresh = await getPlaylistItemsByPlaylistId(matched.playlist_id);
+      if (fresh.success && Array.isArray(fresh.data) && fresh.data.length > 0) {
+        rawItems = fresh.data as unknown as RawPlaylistItem[];
+        revalidateSignage();
+      }
+    }
 
     // 透過 proxy 路由提供 .html，避免 Vercel Blob 的 attachment disposition
     // 讓 iframe 能正常嵌入渲染（而非觸發下載）。

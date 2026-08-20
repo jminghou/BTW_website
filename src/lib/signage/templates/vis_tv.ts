@@ -362,6 +362,10 @@ const CUSTOM_CSS = `
             background-color: transparent;
             transition: all 0.3s ease;
             position: relative;
+            cursor: pointer;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
         }
 
         /* 密集模式下的項目 */
@@ -451,6 +455,41 @@ const CUSTOM_CSS = `
             font-weight: 700;
         }
 
+        /* 第一次點擊提示（需再點一次才切換售完） */
+        .menu-list-item.tap-armed {
+            background-color: rgba(255, 255, 255, 0.45);
+            border-radius: 16px;
+        }
+
+        /* 售完：文字變灰、編號改為「售完」；號碼不重排 */
+        .menu-list-item.sold-out .item-name,
+        .menu-list-item.sold-out .item-english-name {
+            color: #9a9a9a;
+        }
+        .menu-list-item.sold-out .item-price-block,
+        .menu-list-item.sold-out .item-price-prefix {
+            color: #b0b0b0;
+        }
+        .menu-list-item.sold-out .item-number-badge {
+            background-color: #9a9a9a;
+            font-size: 15px;
+            font-weight: 700;
+            letter-spacing: 0;
+            line-height: 1;
+        }
+        .menu-list-item.sold-out.active {
+            background-color: transparent;
+            border: none;
+            box-shadow: none;
+            margin-bottom: 0;
+        }
+        .menu-list-item.sold-out.active::before {
+            display: none;
+        }
+        .menu-list-item.sold-out.active .item-number-badge {
+            background-color: #9a9a9a;
+        }
+
         /* 側邊欄調整 */
         .sidebar {
             z-index: 100;
@@ -490,7 +529,7 @@ function generateGroupHtml(itemsRaw: MealItem[]): { html: string; warnings: stri
     <link rel="stylesheet" href="../../css/vis_ad_machine.css">
     ${CUSTOM_CSS}
 </head>
-<body>
+<body data-menu-key="${esc(location)}|${esc(mealTime)}|${esc(date)}">
     <div class="container">
 
         <div class="sidebar">
@@ -565,7 +604,7 @@ function generateGroupHtml(itemsRaw: MealItem[]): { html: string; warnings: stri
     const activeClass = idx === 1 ? 'active' : '';
     html += `
             <div class="menu-list-item ${activeClass}">
-                <div class="item-number-badge">${idx}</div>
+                <div class="item-number-badge" data-number="${idx}">${idx}</div>
                 <div class="item-info">
                     <div class="item-name">${esc(item.餐點名稱)}</div>
                     <div class="item-english-name">${esc(item.英文名稱 ?? '')}</div>
@@ -582,7 +621,7 @@ function generateGroupHtml(itemsRaw: MealItem[]): { html: string; warnings: stri
 
   html += `
     </div>
-    <script src="../../js/spotlight_slideshow.js"></script>
+    <script src="../../js/vis_tv_slideshow.js"></script>
     <script>
     /* 電視盒等比縮放：把 1920x1080 設計畫布等比縮放並置中，
        填滿電視盒實際視窗（含非 16:9 時自動留邊置中，不裁切、不偏角落） */

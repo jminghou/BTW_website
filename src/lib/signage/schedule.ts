@@ -101,17 +101,28 @@ export function getCurrentDateString(now: Date = new Date()): string {
 
 /**
  * 將 PG 的 time/date 欄位正規化成字串 (確保比較邏輯穩定)
+ *
+ * Data Cache 會把 Date 序列化成 ISO 字串。DATE 在台灣時區常是
+ * `YYYY-MM-DDT16:00:00.000Z`（當天 00:00 +8 = 前一天 16:00Z），
+ * 若直接取前 10 碼會變成「前一天」，單日排程就永遠配不到今天。
  */
 function toTimeString(val: unknown): string {
   if (val instanceof Date) return getCurrentTimeString(val);
-  return String(val);
+  const s = String(val).trim();
+  const clock = s.match(/^(\d{2}:\d{2}(?::\d{2})?)/);
+  if (clock) return clock[1].length === 5 ? `${clock[1]}:00` : clock[1];
+  const d = new Date(s);
+  if (!Number.isNaN(d.getTime())) return getCurrentTimeString(d);
+  return s;
 }
 
 function toDateString(val: unknown): string | null {
-  if (val === null || val === undefined) return null;
+  if (val === null || val === undefined || val === '') return null;
   if (val instanceof Date) return getCurrentDateString(val);
-  // PG 回傳 Date 物件或 "YYYY-MM-DD" 字串；都標準化為 "YYYY-MM-DD"
-  const s = String(val);
+  const s = String(val).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const d = new Date(s);
+  if (!Number.isNaN(d.getTime())) return getCurrentDateString(d);
   return s.length >= 10 ? s.substring(0, 10) : s;
 }
 

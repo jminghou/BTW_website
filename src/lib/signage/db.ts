@@ -787,6 +787,31 @@ export async function batchDeletePlaylists(ids: number[]) {
 }
 
 /**
+ * 刪除指定廠區內已沒有任何有效素材的播放清單。
+ * 素材刪除時 playlist_items 會被外鍵級聯刪除，因此失聯列表通常會成為空列表；
+ * JOIN assets 的檢查也兼容可能存在的舊版孤兒資料。
+ */
+export async function deleteDisconnectedPlaylistsBySite(siteId: number) {
+  try {
+    const result = await sql`
+      DELETE FROM signage_playlists AS p
+      WHERE p.site_id = ${siteId}
+        AND NOT EXISTS (
+          SELECT 1
+          FROM signage_playlist_items AS pi
+          INNER JOIN signage_assets AS a ON a.id = pi.asset_id
+          WHERE pi.playlist_id = p.id
+        )
+      RETURNING p.id, p.name;
+    `;
+    return { success: true, data: result };
+  } catch (error) {
+    console.error('刪除失聯播放清單時發生錯誤：', error);
+    return { success: false, error };
+  }
+}
+
+/**
  * 一鍵素材轉列表：把該廠區的每個素材各建一個同名播放清單（含 1 個 item）
  * 對應 v2.0 admin.py auto-create-from-assets，但 duration 預設 180 秒。
  * 同名清單已存在則跳過。回傳 { created, skipped }。
