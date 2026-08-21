@@ -2,8 +2,8 @@
  * VIS_世界_電視版：左側 spotlight 輪播 + 右側雙擊標示售完。
  * 僅 vis_tv 使用；電腦版 vis3 仍走 spotlight_slideshow.js。
  *
- * 售完狀態以「據點 + 時段 + 日期」為 key 存在 localStorage，
- * 同一餐期內重新載入仍會記住；換另一份菜單（不同餐期／日期）則是全新狀態。
+ * 售完狀態以「據點 + 時段 + 日期」為 key 存在伺服器，
+ * 同一餐期內所有裝置（手機、廣告機）共用；換餐期後是全新狀態。
  */
 document.addEventListener('DOMContentLoaded', function () {
     const spotlightItems = document.querySelectorAll('.spotlight-item');
@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const INTERVAL_MS = 2500;
     const DOUBLE_TAP_MS = 800;
+    const POLL_MS = 2000;
     const STORAGE_PREFIX = 'vis_tv_soldout:';
 
     let currentIndex = 0;
@@ -23,14 +24,22 @@ document.addEventListener('DOMContentLoaded', function () {
     let lastTapIndex = -1;
     let lastTapAt = 0;
     let tapArmedTimer = null;
+    let pollTimer = null;
+    let persistTimer = null;
 
-    function storageKey() {
+    function menuKey() {
         const explicit = document.body.getAttribute('data-menu-key');
-        if (explicit) return STORAGE_PREFIX + explicit;
+        if (explicit) return explicit.trim();
         const loc = (document.querySelector('.location') || {}).textContent || '';
         const meal = (document.querySelector('.meal-time') || {}).textContent || '';
         const date = (document.querySelector('.date-text') || {}).textContent || '';
-        return STORAGE_PREFIX + [loc, meal, date].map(function (s) { return String(s).trim(); }).join('|');
+        return [loc, meal, date].map(function (s) { return String(s).trim(); }).join('|');
+    }
+
+    const MENU_KEY = menuKey();
+
+    function storageKey() {
+        return STORAGE_PREFIX + MENU_KEY;
     }
 
     function dishName(el) {
@@ -52,8 +61,17 @@ document.addEventListener('DOMContentLoaded', function () {
         try {
             localStorage.setItem(storageKey(), JSON.stringify(Array.from(nameSet)));
         } catch (e) {
-            // 電視盒若關閉儲存空間則略過，這一輪仍可操作，只是重整後不會記住
+            // 電視盒若關閉儲存空間則略過
         }
+    }
+
+    function namesEqual(a, b) {
+        if (a.size !== b.size) return false;
+        var ok = true;
+        a.forEach(function (n) {
+            if (!b.has(n)) ok = false;
+        });
+        return ok;
     }
 
     const soldOutNames = loadSoldOutNames();
@@ -130,6 +148,53 @@ document.addEventListener('DOMContentLoaded', function () {
         timer = setInterval(nextSlide, INTERVAL_MS);
     }
 
+    function applyRemoteNames(arr) {
+        const next = new Set(Array.isArray(arr) ? arr : []);
+        if (namesEqual(soldOutNames, next)) return;
+
+        soldOutNames.clear();
+        next.forEach(function (n) { soldOutNames.add(n); });
+        saveSoldOutNames(soldOutNames);
+        restoreSoldOutStyles();
+
+        if (soldOutNames.size > 0 && isSoldOut(currentIndex)) {
+            const jump = findAvailable(currentIndex, true);
+            if (jump >= 0) showSlide(jump);
+        }
+        startTimer();
+    }
+
+    function apiUrl() {
+        return '/api/signage/soldout?key=' + encodeURIComponent(MENU_KEY);
+    }
+
+    function fetchSoldOut() {
+        if (!MENU_KEY) return;
+        fetch(apiUrl(), { cache: 'no-store' })
+            .then(function (res) { return res.ok ? res.json() : null; })
+            .then(function (json) {
+                if (!json || !json.success || !Array.isArray(json.data)) return;
+                applyRemoteNames(json.data);
+            })
+            .catch(function () { /* 離線時維持目前畫面 */ });
+    }
+
+    function persistSoldOut() {
+        if (!MENU_KEY) return;
+        if (persistTimer) clearTimeout(persistTimer);
+        persistTimer = setTimeout(function () {
+            fetch('/api/signage/soldout', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                cache: 'no-store',
+                body: JSON.stringify({
+                    key: MENU_KEY,
+                    items: Array.from(soldOutNames),
+                }),
+            }).catch(function () { /* 寫入失敗時仍保留本機畫面，下一輪輪詢會再對齊 */ });
+        }, 80);
+    }
+
     function clearTapArmed() {
         menuItems.forEach(function (el) { el.classList.remove('tap-armed'); });
         lastTapIndex = -1;
@@ -156,6 +221,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
         saveSoldOutNames(soldOutNames);
+        persistSoldOut();
         startTimer();
     }
 
@@ -186,4 +252,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const initial = findAvailable(0, false);
     if (initial >= 0) showSlide(initial);
     startTimer();
+
+    fetchSoldOut();
+    pollTimer = setInterval(fetchSoldOut, POLL_MS);
 });

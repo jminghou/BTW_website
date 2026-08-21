@@ -621,7 +621,7 @@ function generateGroupHtml(itemsRaw: MealItem[]): { html: string; warnings: stri
 
   html += `
     </div>
-    <script src="../../js/vis_tv_slideshow.js"></script>
+    <script src="../../js/vis_tv_slideshow.js?v=2"></script>
     <script>
     /* 電視盒等比縮放：把 1920x1080 設計畫布等比縮放並置中，
        填滿電視盒實際視窗（含非 16:9 時自動留邊置中，不裁切、不偏角落） */

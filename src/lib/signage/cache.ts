@@ -28,6 +28,12 @@ import { revalidateTag, unstable_cache } from 'next/cache';
 export const SIGNAGE_TAG = 'signage';
 
 /**
+ * 售完狀態專用標籤。與 SIGNAGE_TAG 分開，避免現場點售完時
+ * 把播放清單／素材快取整組打掉（那會讓每台廣告機立刻重打 DB）。
+ */
+export const SIGNAGE_SOLDOUT_TAG = 'signage-soldout';
+
+/**
  * 包一層 Data Cache 的看版讀取。
  *
  * @param keyParts 唯一識別這筆讀取的鍵（需含所有查詢參數，例如螢幕 key、playlist id）
@@ -44,6 +50,17 @@ export function cachedSignageRead<T>(
   })();
 }
 
+/** 售完狀態讀取：平常輪詢打快取；現場點售完才失效再查 DB。 */
+export function cachedSoldOutRead<T>(
+  keyParts: string[],
+  read: () => Promise<T>,
+): Promise<T> {
+  return unstable_cache(read, ['signage-soldout', ...keyParts], {
+    tags: [SIGNAGE_SOLDOUT_TAG],
+    revalidate: false,
+  })();
+}
+
 /**
  * 讓所有看版讀取快取失效。
  *
@@ -56,5 +73,14 @@ export function revalidateSignage(): void {
     revalidateTag(SIGNAGE_TAG);
   } catch (error) {
     console.warn('看版快取失效通知失敗（資料已寫入成功）：', error);
+  }
+}
+
+/** 只讓售完狀態快取失效，不動播放清單。 */
+export function revalidateSoldOut(): void {
+  try {
+    revalidateTag(SIGNAGE_SOLDOUT_TAG);
+  } catch (error) {
+    console.warn('售完快取失效通知失敗（資料已寫入成功）：', error);
   }
 }

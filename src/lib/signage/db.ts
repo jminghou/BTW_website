@@ -167,6 +167,14 @@ export async function createSignageTables() {
       );
     `;
 
+    await sql`
+      CREATE TABLE IF NOT EXISTS signage_soldout (
+        menu_key VARCHAR(200) PRIMARY KEY,
+        dish_names TEXT NOT NULL DEFAULT '[]',
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
     console.log('看版系統資料表建立成功！');
     return { success: true, message: '看版系統資料表建立成功' };
   } catch (error) {
@@ -196,6 +204,79 @@ async function ensureScheduleDateColumns() {
     });
   }
   return scheduleDateColumnsReady;
+}
+
+/**
+ * 售完狀態表：以「據點|時段|日期」為 key，給手機與廣告機共用。
+ * 用 rawSql，避免寫入時觸發整組看版快取失效。
+ */
+let soldOutTableReady: Promise<void> | null = null;
+
+async function ensureSoldOutTable() {
+  if (!soldOutTableReady) {
+    soldOutTableReady = (async () => {
+      await rawSql`
+        CREATE TABLE IF NOT EXISTS signage_soldout (
+          menu_key VARCHAR(200) PRIMARY KEY,
+          dish_names TEXT NOT NULL DEFAULT '[]',
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+      `;
+    })().catch(error => {
+      soldOutTableReady = null;
+      throw error;
+    });
+  }
+  return soldOutTableReady;
+}
+
+function parseDishNames(raw: unknown): string[] {
+  if (Array.isArray(raw)) {
+    return raw.filter((n): n is string => typeof n === 'string' && n.trim() !== '');
+  }
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((n): n is string => typeof n === 'string' && n.trim() !== '');
+      }
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+export async function getSoldOutDishes(menuKey: string) {
+  try {
+    await ensureSoldOutTable();
+    const rows = await rawSql`
+      SELECT dish_names FROM signage_soldout WHERE menu_key = ${menuKey} LIMIT 1;
+    `;
+    const dishNames = rows.length > 0 ? parseDishNames((rows[0] as { dish_names: unknown }).dish_names) : [];
+    return { success: true as const, data: dishNames };
+  } catch (error) {
+    console.error('讀取售完狀態時發生錯誤：', error);
+    return { success: false as const, error };
+  }
+}
+
+export async function setSoldOutDishes(menuKey: string, dishNames: string[]) {
+  try {
+    await ensureSoldOutTable();
+    const payload = JSON.stringify(dishNames);
+    await rawSql`
+      INSERT INTO signage_soldout (menu_key, dish_names, updated_at)
+      VALUES (${menuKey}, ${payload}, CURRENT_TIMESTAMP)
+      ON CONFLICT (menu_key) DO UPDATE
+        SET dish_names = EXCLUDED.dish_names,
+            updated_at = CURRENT_TIMESTAMP;
+    `;
+    return { success: true as const };
+  } catch (error) {
+    console.error('寫入售完狀態時發生錯誤：', error);
+    return { success: false as const, error };
+  }
 }
 
 // ==================== Regions ====================
