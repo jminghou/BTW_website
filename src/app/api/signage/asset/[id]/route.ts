@@ -109,6 +109,25 @@ html.__signage-pending body {
   return `${output}\n${script}`;
 }
 
+const VIS_TV_SLIDESHOW_SRC = '/signage-assets/js/vis_tv_slideshow.js?v=4';
+
+/** vis_tv 三欄菜單：確保載入現行售完同步腳本（含舊檔仍引用 spotlight_slideshow.js 的情況） */
+function ensureVisTvSoldOutRuntime(html: string): string {
+  const isVisTv = html.includes('menu-list-item') && html.includes('spotlight-item');
+  if (!isVisTv) return html;
+
+  let out = html.replace(/vis_tv_slideshow\.js(\?v=\d+)?/g, 'vis_tv_slideshow.js?v=4');
+  if (out.includes('vis_tv_slideshow.js')) return out;
+
+  if (/spotlight_slideshow\.js/.test(out)) {
+    return out.replace(/[^"'=\s]*spotlight_slideshow\.js[^"'\s]*/g, VIS_TV_SLIDESHOW_SRC);
+  }
+
+  const tag = `<script src="${VIS_TV_SLIDESHOW_SRC}"></script>\n`;
+  if (/<\/body>/i.test(out)) return out.replace(/<\/body>/i, `${tag}</body>`);
+  return out + tag;
+}
+
 /**
  * 素材 HTML 代理路由
  * GET /api/signage/asset/[id]
@@ -152,9 +171,11 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     // 容忍任意層數的 ../；菜單圖片用的 https:// 絕對 URL 不受影響。
     // CSS 內部的 ../font、../pic 不在 HTML 內，由瀏覽器相對於
     // /signage-assets/css/ 自動解析，無需在此改寫。
-    const rewritten = html.replace(
-      /(?:\.\.\/)+(css|js|pic|font)\//g,
-      '/signage-assets/$1/',
+    const rewritten = ensureVisTvSoldOutRuntime(
+      html.replace(
+        /(?:\.\.\/)+(css|js|pic|font)\//g,
+        '/signage-assets/$1/',
+      ),
     );
 
     const outputHtml = injectReadyHandshakeScript(rewritten);

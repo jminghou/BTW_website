@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { saveContact, getContacts, deleteContact } from '../../../lib/db';
+import { saveContact, getContacts, deleteContact, updateContactEmailStatus } from '../../../lib/db';
 import nodemailer from 'nodemailer';
 
 /**
@@ -8,12 +8,46 @@ import nodemailer from 'nodemailer';
  * GET /api/contacts - 取得所有聯絡表單資料
  */
 
+const DEFAULT_NOTIFY_TO = [
+  '"Zoe Lee" <zoe.lee@haohuagroup.com.tw>',
+  '"Jermaine Hou" <jermaine.hou@haohuagroup.com.tw>',
+];
+
+function getNotifyRecipients(): string[] {
+  const raw = process.env.CONTACT_NOTIFY_EMAILS?.trim();
+  if (!raw) return DEFAULT_NOTIFY_TO;
+
+  return raw
+    .split(';')
+    .flatMap((part) => {
+      const trimmed = part.trim();
+      if (!trimmed) return [];
+      if (trimmed.includes('<') && trimmed.includes('>')) return [trimmed];
+      return trimmed.split(',').map((item) => item.trim()).filter(Boolean);
+    })
+    .filter(Boolean);
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
+
 // 建立郵件傳送器
 const createTransporter = () => {
   return nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.SMTP_PORT || '465'),
-    secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
+    host: process.env.SMTP_HOST || 'smtp.office365.com',
+    port: parseInt(process.env.SMTP_PORT || '587'),
+    secure: process.env.SMTP_SECURE === 'true', // Outlook 587 用 STARTTLS，應為 false
     auth: {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS,
@@ -44,17 +78,23 @@ export async function POST(request: NextRequest) {
     });
 
     if (result.success) {
+      const contactId = result.data?.id as number | undefined;
+      let emailStatus: 'sent' | 'failed' = 'failed';
+      let emailError: string | null = null;
+
       // 資料庫儲存成功後，嘗試發送郵件
       try {
         const transporter = createTransporter();
-        
-        // 準備郵件內容
+        const safeIdentity = escapeHtml(String(identity));
+        const safeName = escapeHtml(String(user_name));
+        const safeTitle = escapeHtml(String(title));
+        const safeEmail = escapeHtml(String(user_email));
+        const safePhone = escapeHtml(String(phone || '未提供'));
+        const safeMessage = escapeHtml(String(message));
+
         const mailOptions = {
           from: process.env.SMTP_FROM || `"官網聯絡表單" <${process.env.SMTP_USER}>`,
-          to: [
-            'zoe.lee@haohuagroup.com.tw',
-            'jermaine.hou@haohuagroup.com.tw'
-          ], // 寄給聯絡表單負責人
+          to: getNotifyRecipients(),
           replyTo: user_email, // 設定回信地址為訪客信箱
           subject: `${identity}_${title}_${user_name}`,
           html: `
@@ -65,27 +105,27 @@ export async function POST(request: NextRequest) {
               <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
                 <tr>
                   <td style="padding: 10px; background-color: #f9f9f9; width: 100px; font-weight: bold;">身份</td>
-                  <td style="padding: 10px; border-bottom: 1px solid #eee;">${identity}</td>
+                  <td style="padding: 10px; border-bottom: 1px solid #eee;">${safeIdentity}</td>
                 </tr>
                 <tr>
                   <td style="padding: 10px; background-color: #f9f9f9; font-weight: bold;">姓名/單位</td>
-                  <td style="padding: 10px; border-bottom: 1px solid #eee;">${user_name}</td>
+                  <td style="padding: 10px; border-bottom: 1px solid #eee;">${safeName}</td>
                 </tr>
                 <tr>
                   <td style="padding: 10px; background-color: #f9f9f9; font-weight: bold;">主旨</td>
-                  <td style="padding: 10px; border-bottom: 1px solid #eee;">${title}</td>
+                  <td style="padding: 10px; border-bottom: 1px solid #eee;">${safeTitle}</td>
                 </tr>
                 <tr>
                   <td style="padding: 10px; background-color: #f9f9f9; font-weight: bold;">Email</td>
-                  <td style="padding: 10px; border-bottom: 1px solid #eee;"><a href="mailto:${user_email}">${user_email}</a></td>
+                  <td style="padding: 10px; border-bottom: 1px solid #eee;"><a href="mailto:${safeEmail}">${safeEmail}</a></td>
                 </tr>
                 <tr>
                   <td style="padding: 10px; background-color: #f9f9f9; font-weight: bold;">電話</td>
-                  <td style="padding: 10px; border-bottom: 1px solid #eee;">${phone || '未提供'}</td>
+                  <td style="padding: 10px; border-bottom: 1px solid #eee;">${safePhone}</td>
                 </tr>
                 <tr>
                   <td style="padding: 10px; background-color: #f9f9f9; font-weight: bold; vertical-align: top;">訊息內容</td>
-                  <td style="padding: 10px; border-bottom: 1px solid #eee; white-space: pre-wrap;">${message}</td>
+                  <td style="padding: 10px; border-bottom: 1px solid #eee; white-space: pre-wrap;">${safeMessage}</td>
                 </tr>
               </table>
               
@@ -97,24 +137,31 @@ export async function POST(request: NextRequest) {
           `
         };
 
-        // 發送郵件
-        if (process.env.SMTP_USER && process.env.SMTP_PASS) {
-          await transporter.sendMail(mailOptions);
-          console.log('郵件發送成功');
+        if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+          emailError = '未設定 SMTP 帳號或密碼，已跳過郵件發送';
+          console.warn(emailError);
         } else {
-          console.warn('未設定 SMTP 資訊，跳過郵件發送');
+          await transporter.sendMail(mailOptions);
+          emailStatus = 'sent';
+          console.log('郵件發送成功');
         }
+      } catch (emailErr) {
+        emailError = getErrorMessage(emailErr);
+        console.error('郵件發送失敗：', emailErr);
+      }
 
-      } catch (emailError) {
-        console.error('郵件發送失敗：', emailError);
-        // 注意：即使寄信失敗，我們還是回傳成功，因為資料已經存入資料庫了
-        // 我們只在後台記錄錯誤
+      if (contactId) {
+        await updateContactEmailStatus(contactId, emailStatus, emailError);
       }
 
       return NextResponse.json({
         success: true,
         message: '聯絡表單提交成功！',
-        data: result.data
+        data: {
+          ...result.data,
+          email_status: emailStatus,
+          email_error: emailError,
+        }
       }, { status: 201 });
     } else {
       return NextResponse.json({
@@ -198,4 +245,4 @@ export async function DELETE(request: NextRequest) {
       { status: 500 }
     );
   }
-} 
+}

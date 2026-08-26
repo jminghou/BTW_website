@@ -11,6 +11,8 @@ interface Contact {
   phone: string;
   message: string;
   created_at: string;
+  email_status?: 'sent' | 'failed' | null;
+  email_error?: string | null;
 }
 
 export default function ContactsManager() {
@@ -20,12 +22,17 @@ export default function ContactsManager() {
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterIdentity, setFilterIdentity] = useState('all');
+  const [filterEmailStatus, setFilterEmailStatus] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
   useEffect(() => {
     loadContacts();
   }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterIdentity, filterEmailStatus]);
 
   const loadContacts = async () => {
     setIsLoading(true);
@@ -65,7 +72,7 @@ export default function ContactsManager() {
   const exportToCSV = () => {
     if (filteredContacts.length === 0) return;
 
-    const headers = ['ID', '身份', '姓名', '主旨', '電子信箱', '電話', '訊息', '提交時間'];
+    const headers = ['ID', '身份', '姓名', '主旨', '電子信箱', '電話', '訊息', '提交時間', '寄信狀態', '寄信錯誤'];
     const csvContent = [
       headers.join(','),
       ...filteredContacts.map(contact => [
@@ -76,7 +83,9 @@ export default function ContactsManager() {
         contact.user_email,
         contact.phone || '',
         `"${contact.message.replace(/"/g, '""')}"`,
-        new Date(contact.created_at).toLocaleString('zh-TW')
+        new Date(contact.created_at).toLocaleString('zh-TW'),
+        contact.email_status === 'sent' ? '已寄出' : contact.email_status === 'failed' ? '未寄出' : '未知',
+        `"${(contact.email_error || '').replace(/"/g, '""')}"`
       ].join(','))
     ].join('\n');
 
@@ -106,8 +115,13 @@ export default function ContactsManager() {
       contact.message.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesFilter = filterIdentity === 'all' || contact.identity === filterIdentity;
+    const matchesEmailStatus =
+      filterEmailStatus === 'all' ||
+      (filterEmailStatus === 'failed' && contact.email_status === 'failed') ||
+      (filterEmailStatus === 'sent' && contact.email_status === 'sent') ||
+      (filterEmailStatus === 'unknown' && !contact.email_status);
     
-    return matchesSearch && matchesFilter;
+    return matchesSearch && matchesFilter && matchesEmailStatus;
   });
 
   // 分頁
@@ -118,6 +132,32 @@ export default function ContactsManager() {
   );
 
   const uniqueIdentities = [...new Set(contacts.map(contact => contact.identity))];
+  const failedEmailCount = contacts.filter(contact => contact.email_status === 'failed').length;
+
+  const renderEmailStatus = (contact: Contact) => {
+    if (contact.email_status === 'sent') {
+      return (
+        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+          已寄出
+        </span>
+      );
+    }
+    if (contact.email_status === 'failed') {
+      return (
+        <span
+          className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800"
+          title={contact.email_error || '郵件發送失敗'}
+        >
+          未寄出
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">
+        未知
+      </span>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 py-16">
@@ -130,6 +170,11 @@ export default function ContactsManager() {
           <p className="text-lg text-gray-600">
             請定期檢查有沒有人在官網上聯絡我們，看到請及時回覆
           </p>
+          {failedEmailCount > 0 && (
+            <p className="mt-3 text-sm font-medium text-red-600">
+              有 {failedEmailCount} 筆通知信未寄出，請優先回覆這些表單
+            </p>
+          )}
         </div>
 
         {/* Controls */}
@@ -165,6 +210,23 @@ export default function ContactsManager() {
                 {uniqueIdentities.map(identity => (
                   <option key={identity} value={identity}>{identity}</option>
                 ))}
+              </select>
+            </div>
+
+            <div className="lg:w-48">
+              <label htmlFor="email-status-filter" className="block text-sm font-medium text-gray-700 mb-2">
+                篩選寄信狀態
+              </label>
+              <select
+                id="email-status-filter"
+                value={filterEmailStatus}
+                onChange={(e) => setFilterEmailStatus(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
+              >
+                <option value="all">全部狀態</option>
+                <option value="failed">未寄出</option>
+                <option value="sent">已寄出</option>
+                <option value="unknown">未知（舊資料）</option>
               </select>
             </div>
           </div>
@@ -204,10 +266,10 @@ export default function ContactsManager() {
                 </svg>
               </div>
               <p className="text-lg font-medium text-gray-900 mb-2">
-                {searchTerm || filterIdentity !== 'all' ? '沒有符合條件的資料' : '尚無聯絡表單'}
+                {searchTerm || filterIdentity !== 'all' || filterEmailStatus !== 'all' ? '沒有符合條件的資料' : '尚無聯絡表單'}
               </p>
               <p className="text-gray-500">
-                {searchTerm || filterIdentity !== 'all' ? '請調整搜尋條件' : '目前沒有收到任何聯絡表單資料'}
+                {searchTerm || filterIdentity !== 'all' || filterEmailStatus !== 'all' ? '請調整搜尋條件' : '目前沒有收到任何聯絡表單資料'}
               </p>
             </div>
           ) : (
@@ -228,6 +290,9 @@ export default function ContactsManager() {
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         時間
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        寄信
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         操作
@@ -277,6 +342,9 @@ export default function ContactsManager() {
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                           {formatDate(contact.created_at)}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          {renderEmailStatus(contact)}
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
                           {deleteConfirm === contact.id ? (

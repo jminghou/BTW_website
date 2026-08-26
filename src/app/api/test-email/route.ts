@@ -22,10 +22,10 @@ export async function GET(request: NextRequest) {
       }, { status: 500 });
     }
 
-    // 2. 建立 Transporter
+    // 2. 建立 Transporter（預設走 Microsoft 365 / Outlook）
     const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: parseInt(process.env.SMTP_PORT || '465'),
+      host: process.env.SMTP_HOST || 'smtp.office365.com',
+      port: parseInt(process.env.SMTP_PORT || '587'),
       secure: process.env.SMTP_SECURE === 'true',
       auth: {
         user: process.env.SMTP_USER,
@@ -47,9 +47,12 @@ export async function GET(request: NextRequest) {
     });
 
     // 4. 嘗試寄送測試信
+    const notifyTo = process.env.CONTACT_NOTIFY_EMAILS?.trim()
+      || '"Zoe Lee" <zoe.lee@haohuagroup.com.tw>; "Jermaine Hou" <jermaine.hou@haohuagroup.com.tw>';
+
     const info = await transporter.sendMail({
       from: process.env.SMTP_FROM || `"測試系統" <${process.env.SMTP_USER}>`,
-      to: 'service@haohuagroup.com.tw', // 寄給自己測試
+      to: notifyTo,
       subject: 'SMTP 設定測試信',
       text: '這是一封測試信，如果您收到這封信，代表 SMTP 設定正確！',
       html: '<b>這是一封測試信</b>，如果您收到這封信，代表 SMTP 設定正確！',

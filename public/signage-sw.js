@@ -15,7 +15,7 @@
  * 不支援 Service Worker 的裝置由播放端 feature-detect 略過註冊，自動退回 Layer 1。
  */
 
-const CACHE = 'signage-cache-v2';
+const CACHE = 'signage-cache-v3';
 
 self.addEventListener('install', () => {
   self.skipWaiting();
@@ -107,6 +107,18 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // 售完狀態必須每次打到伺服器，絕不可快取
+  if (sameOrigin && url.pathname === '/api/signage/soldout') {
+    event.respondWith(networkOnly(req));
+    return;
+  }
+
+  // vis_tv 售完腳本：改走 network-first，避免 cache-first 把舊版鎖在廣告機上
+  if (sameOrigin && /\/signage-assets\/js\/vis_tv_slideshow\.js$/.test(url.pathname)) {
+    event.respondWith(networkFirst(req));
+    return;
+  }
+
   // 版本化素材 HTML 與共用靜態資源：cache-first
   if (
     sameOrigin &&
@@ -124,6 +136,10 @@ self.addEventListener('fetch', (event) => {
   }
   // 其餘不介入
 });
+
+async function networkOnly(req) {
+  return fetch(req, { cache: 'no-store' });
+}
 
 async function cacheFirst(req) {
   const cache = await caches.open(CACHE);

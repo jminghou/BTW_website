@@ -74,6 +74,9 @@ function writeNode(node: Element, value: string): void {
   const t = primaryTextNode(node);
   if (t) t.nodeValue = value;
   else node.textContent = value;
+  // vis_tv 售完功能用 data-number 記住原始編號。重建清單時若只改文字、
+  // 沒改這個屬性，播放端會把所有項目的顯示編號蓋回範本上的「1」。
+  if (node.hasAttribute('data-number')) node.setAttribute('data-number', value);
 }
 
 function makeField(node: Element | null): FocusField {
@@ -169,7 +172,7 @@ function parseFocusRows(html: string): {
       if (!t) continue;
       t.querySelectorAll('[data-focus-id]').forEach(el => el.removeAttribute('data-focus-id'));
       t.removeAttribute('data-focus-id');
-      t.classList?.remove('active');
+      t.classList?.remove('active', 'sold-out', 'tap-armed');
     }
   } else {
     // 泛用解析（單一清單版型）：以每道菜的「中文菜名／品項名」當列錨點
@@ -257,11 +260,15 @@ function regenerateMenuList(doc: Document, templates: ListTemplates): void {
       currentRest = d.restaurant;
     }
     const li = templates.item!.cloneNode(true) as Element;
-    li.classList?.remove('active');
+    li.classList?.remove('active', 'sold-out', 'tap-armed');
     if (i === 0) li.classList?.add('active');
 
     const badge = li.querySelector('[class*="number-badge"]:not(img), [class*="item-number"]');
-    if (badge) writeNode(badge, String(i + 1));
+    if (badge) {
+      const num = String(i + 1);
+      writeNode(badge, num);
+      badge.setAttribute('data-number', num);
+    }
     const nameEl = li.querySelector('[class*="item-name"]:not([class*="english"]), [class*="chinese-name"]:not([class*="english"])');
     if (nameEl) writeNode(nameEl, d.chinese);
     const engEl = li.querySelector('[class*="english-name"]');

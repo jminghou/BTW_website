@@ -17,8 +17,17 @@ export function assetVersion(blobUrl: string | null | undefined): string {
   return m ? m[1] : '';
 }
 
+/**
+ * 素材代理輸出的後處理版本。blob 的 ?v= 只代表檔案內容；
+ * 代理還會改寫腳本／注入售完同步，這層一變就必須換網址，
+ * 否則 CDN、廣告機 Service Worker 會一直吐舊 HTML。
+ */
+const ASSET_RUNTIME = '4';
+
 /** 產生帶版本碼的素材代理網址，供前台 iframe 與後台預覽使用 */
 export function assetProxyUrl(assetId: number, blobUrl: string | null | undefined): string {
   const v = assetVersion(blobUrl);
-  return v ? `/api/signage/asset/${assetId}?v=${v}` : `/api/signage/asset/${assetId}`;
+  const base = v ? `/api/signage/asset/${assetId}?v=${v}` : `/api/signage/asset/${assetId}`;
+  const sep = v ? '&' : '?';
+  return `${base}${sep}r=${ASSET_RUNTIME}`;
 }

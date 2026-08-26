@@ -52,13 +52,17 @@ export function cachedSignageRead<T>(
 
 /** 售完狀態讀取：平常輪詢打快取；現場點售完才失效再查 DB。 */
 export function cachedSoldOutRead<T>(
-  keyParts: string[],
+  menuKey: string,
   read: () => Promise<T>,
 ): Promise<T> {
-  return unstable_cache(read, ['signage-soldout', ...keyParts], {
-    tags: [SIGNAGE_SOLDOUT_TAG],
+  return unstable_cache(read, ['signage-soldout', menuKey], {
+    tags: [SIGNAGE_SOLDOUT_TAG, soldOutTagFor(menuKey)],
     revalidate: false,
   })();
+}
+
+function soldOutTagFor(menuKey: string): string {
+  return `soldout-${menuKey.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
 }
 
 /**
@@ -77,9 +81,10 @@ export function revalidateSignage(): void {
 }
 
 /** 只讓售完狀態快取失效，不動播放清單。 */
-export function revalidateSoldOut(): void {
+export function revalidateSoldOut(menuKey?: string): void {
   try {
     revalidateTag(SIGNAGE_SOLDOUT_TAG);
+    if (menuKey) revalidateTag(soldOutTagFor(menuKey));
   } catch (error) {
     console.warn('售完快取失效通知失敗（資料已寫入成功）：', error);
   }

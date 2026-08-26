@@ -2,8 +2,8 @@
  * VIS_世界_電視版：左側 spotlight 輪播 + 右側雙擊標示售完。
  * 僅 vis_tv 使用；電腦版 vis3 仍走 spotlight_slideshow.js。
  *
- * 售完狀態以「據點 + 時段 + 日期」為 key 存在伺服器，
- * 同一餐期內所有裝置（手機、廣告機）共用；換餐期後是全新狀態。
+ * 售完狀態寫在伺服器，以素材 id（asset:123）為主 key，
+ * 同一份菜單的手機與廣告機共用；換一份菜單（不同 asset）即自動重置。
  */
 document.addEventListener('DOMContentLoaded', function () {
     const spotlightItems = document.querySelectorAll('.spotlight-item');
@@ -24,16 +24,39 @@ document.addEventListener('DOMContentLoaded', function () {
     let lastTapIndex = -1;
     let lastTapAt = 0;
     let tapArmedTimer = null;
-    let pollTimer = null;
     let persistTimer = null;
+    let persistAttempt = 0;
+
+    function originPrefix() {
+        try {
+            return String(location.origin || '');
+        } catch (e) {
+            return '';
+        }
+    }
 
     function menuKey() {
-        const explicit = document.body.getAttribute('data-menu-key');
-        if (explicit) return explicit.trim();
-        const loc = (document.querySelector('.location') || {}).textContent || '';
-        const meal = (document.querySelector('.meal-time') || {}).textContent || '';
-        const date = (document.querySelector('.date-text') || {}).textContent || '';
-        return [loc, meal, date].map(function (s) { return String(s).trim(); }).join('|');
+        try {
+            var path = String(location.pathname || '');
+            var assetMatch = path.match(/\/api\/signage\/asset\/(\d+)/);
+            if (assetMatch) return 'asset:' + assetMatch[1];
+        } catch (e) {}
+
+        var explicit = document.body.getAttribute('data-menu-key');
+        if (explicit) return normalizeKey(explicit);
+
+        var loc = ((document.querySelector('.location') || {}).textContent || '').trim();
+        var meal = ((document.querySelector('.meal-time') || {}).textContent || '').trim();
+        var date = ((document.querySelector('.date-text') || {}).textContent || '').trim();
+        return normalizeKey([loc, meal, date].join('|'));
+    }
+
+    function normalizeKey(key) {
+        return String(key || '').trim().replace(/(\d{4})[./](\d{1,2})[./](\d{1,2})\s*$/, function (_, y, m, d) {
+            var mm = m.length < 2 ? '0' + m : m;
+            var dd = d.length < 2 ? '0' + d : d;
+            return y + '-' + mm + '-' + dd;
+        });
     }
 
     const MENU_KEY = menuKey();
@@ -60,9 +83,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function saveSoldOutNames(nameSet) {
         try {
             localStorage.setItem(storageKey(), JSON.stringify(Array.from(nameSet)));
-        } catch (e) {
-            // 電視盒若關閉儲存空間則略過
-        }
+        } catch (e) {}
     }
 
     function namesEqual(a, b) {
@@ -88,7 +109,6 @@ document.addEventListener('DOMContentLoaded', function () {
         return n;
     }
 
-    /** 從 fromIndex 往後找下一道未售完；skipSelf 時不包含自己。找不到則 -1。 */
     function findAvailable(fromIndex, skipSelf) {
         const n = spotlightItems.length;
         const start = skipSelf ? 1 : 0;
@@ -107,10 +127,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const badge = menu && menu.querySelector('.item-number-badge');
         if (!badge) return;
-        if (!badge.getAttribute('data-number')) {
-            badge.setAttribute('data-number', String(badge.textContent || index + 1).trim());
-        }
-        badge.textContent = soldOut ? '售完' : badge.getAttribute('data-number');
+        const num = String(index + 1);
+        badge.setAttribute('data-number', num);
+        badge.textContent = soldOut ? '售完' : num;
     }
 
     function restoreSoldOutStyles() {
@@ -165,34 +184,80 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function apiUrl() {
-        return '/api/signage/soldout?key=' + encodeURIComponent(MENU_KEY);
+        return originPrefix() + '/api/signage/soldout?key=' + encodeURIComponent(MENU_KEY);
+    }
+
+    function writeUrl() {
+        return originPrefix() + '/api/signage/soldout';
+    }
+
+    function requestJson(method, url, body, cb) {
+        function done(ok, json) {
+            if (typeof cb === 'function') cb(ok, json);
+        }
+
+        if (typeof fetch === 'function') {
+            var opts = { method: method, cache: 'no-store', headers: {} };
+            if (body) {
+                opts.headers['Content-Type'] = 'application/json';
+                opts.body = JSON.stringify(body);
+            }
+            fetch(url, opts)
+                .then(function (res) {
+                    return res.json().then(function (json) {
+                        done(res.ok && json && json.success === true, json);
+                    }).catch(function () { done(false, null); });
+                })
+                .catch(function () { done(false, null); });
+            return;
+        }
+
+        try {
+            var xhr = new XMLHttpRequest();
+            xhr.open(method, url, true);
+            if (body) xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState !== 4) return;
+                var json = null;
+                try { json = JSON.parse(xhr.responseText); } catch (e) {}
+                done(xhr.status >= 200 && xhr.status < 300 && json && json.success === true, json);
+            };
+            xhr.send(body ? JSON.stringify(body) : null);
+        } catch (e) {
+            done(false, null);
+        }
     }
 
     function fetchSoldOut() {
         if (!MENU_KEY) return;
-        fetch(apiUrl(), { cache: 'no-store' })
-            .then(function (res) { return res.ok ? res.json() : null; })
-            .then(function (json) {
-                if (!json || !json.success || !Array.isArray(json.data)) return;
-                applyRemoteNames(json.data);
-            })
-            .catch(function () { /* 離線時維持目前畫面 */ });
+        requestJson('GET', apiUrl(), null, function (ok, json) {
+            if (!ok || !json || !Array.isArray(json.data)) return;
+            applyRemoteNames(json.data);
+        });
     }
 
     function persistSoldOut() {
         if (!MENU_KEY) return;
         if (persistTimer) clearTimeout(persistTimer);
-        persistTimer = setTimeout(function () {
-            fetch('/api/signage/soldout', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                cache: 'no-store',
-                body: JSON.stringify({
-                    key: MENU_KEY,
-                    items: Array.from(soldOutNames),
-                }),
-            }).catch(function () { /* 寫入失敗時仍保留本機畫面，下一輪輪詢會再對齊 */ });
-        }, 80);
+        persistAttempt = 0;
+        persistTimer = setTimeout(sendSoldOut, 50);
+    }
+
+    function sendSoldOut() {
+        var payload = {
+            key: MENU_KEY,
+            items: Array.from(soldOutNames),
+        };
+        requestJson('POST', writeUrl(), payload, function (ok) {
+            if (ok) {
+                persistAttempt = 0;
+                return;
+            }
+            persistAttempt += 1;
+            if (persistAttempt <= 3) {
+                persistTimer = setTimeout(sendSoldOut, 400 * persistAttempt);
+            }
+        });
     }
 
     function clearTapArmed() {
@@ -254,5 +319,5 @@ document.addEventListener('DOMContentLoaded', function () {
     startTimer();
 
     fetchSoldOut();
-    pollTimer = setInterval(fetchSoldOut, POLL_MS);
+    setInterval(fetchSoldOut, POLL_MS);
 });

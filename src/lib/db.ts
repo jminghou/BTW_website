@@ -50,10 +50,15 @@ export async function createTables() {
         user_email VARCHAR(255) NOT NULL,
         phone VARCHAR(20),
         message TEXT NOT NULL,
+        email_status VARCHAR(20),
+        email_error TEXT,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `;
+
+    // 既有資料庫相容遷移：寄信狀態（CREATE TABLE IF NOT EXISTS 不會補欄位）
+    await ensureContactsEmailColumns();
 
     // 建立訂閱電子報資料表
     await sql`
@@ -209,6 +214,11 @@ export async function createTables() {
   }
 }
 
+async function ensureContactsEmailColumns() {
+  await sql`ALTER TABLE contacts ADD COLUMN IF NOT EXISTS email_status VARCHAR(20);`;
+  await sql`ALTER TABLE contacts ADD COLUMN IF NOT EXISTS email_error TEXT;`;
+}
+
 // 儲存聯絡表單資料
 export async function saveContact(contactData: {
   identity: string;
@@ -219,6 +229,7 @@ export async function saveContact(contactData: {
   message: string;
 }) {
   try {
+    await ensureContactsEmailColumns();
     const result = await sql`
       INSERT INTO contacts (identity, user_name, title, user_email, phone, message)
       VALUES (${contactData.identity}, ${contactData.user_name}, ${contactData.title}, 
@@ -234,9 +245,33 @@ export async function saveContact(contactData: {
   }
 }
 
+export async function updateContactEmailStatus(
+  id: number,
+  emailStatus: 'sent' | 'failed',
+  emailError?: string | null
+) {
+  try {
+    await ensureContactsEmailColumns();
+    const errorText = emailError ? emailError.slice(0, 500) : null;
+    const result = await sql`
+      UPDATE contacts
+      SET email_status = ${emailStatus},
+          email_error = ${errorText},
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ${id}
+      RETURNING id, email_status, email_error;
+    `;
+    return { success: true, data: result[0] };
+  } catch (error) {
+    console.error('更新聯絡表單寄信狀態失敗：', error);
+    return { success: false, error: error };
+  }
+}
+
 // 取得所有聯絡表單資料
 export async function getContacts() {
   try {
+    await ensureContactsEmailColumns();
     const result = await sql`
       SELECT * FROM contacts 
       ORDER BY created_at DESC;
