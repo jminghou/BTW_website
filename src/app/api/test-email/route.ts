@@ -1,85 +1,36 @@
-import { NextRequest, NextResponse } from 'next/server';
-import nodemailer from 'nodemailer';
+import { NextResponse } from 'next/server';
+import { getMicrosoftMailStatus, sendMicrosoftMail } from '../../../lib/microsoft-mail';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    // 1. 檢查環境變數
-    const envCheck = {
-      SMTP_HOST: process.env.SMTP_HOST,
-      SMTP_PORT: process.env.SMTP_PORT,
-      SMTP_SECURE: process.env.SMTP_SECURE,
-      SMTP_USER: process.env.SMTP_USER,
-      SMTP_PASS: process.env.SMTP_PASS ? '****** (已設定)' : '(未設定)',
-    };
+    const envCheck = getMicrosoftMailStatus();
 
-    console.log('測試郵件環境變數:', envCheck);
-
-    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    if (!envCheck.MICROSOFT_TENANT_ID || !envCheck.MICROSOFT_CLIENT_ID || !envCheck.MICROSOFT_CLIENT_SECRET) {
       return NextResponse.json({
         success: false,
-        message: 'SMTP 帳號或密碼未設定',
+        message: 'Microsoft Graph 尚未設定完成',
         env: envCheck
       }, { status: 500 });
     }
 
-    // 2. 建立 Transporter（預設走 Microsoft 365 / Outlook）
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.office365.com',
-      port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: process.env.SMTP_SECURE === 'true',
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    });
-
-    // 3. 測試連線 (Verify)
-    await new Promise((resolve, reject) => {
-      transporter.verify(function (error, success) {
-        if (error) {
-          console.error('SMTP 連線驗證失敗:', error);
-          reject(error);
-        } else {
-          console.log('SMTP 連線驗證成功');
-          resolve(success);
-        }
-      });
-    });
-
-    // 4. 嘗試寄送測試信
-    const notifyTo = process.env.CONTACT_NOTIFY_EMAILS?.trim()
-      || '"Zoe Lee" <zoe.lee@haohuagroup.com.tw>; "Jermaine Hou" <jermaine.hou@haohuagroup.com.tw>';
-
-    const info = await transporter.sendMail({
-      from: process.env.SMTP_FROM || `"測試系統" <${process.env.SMTP_USER}>`,
-      to: notifyTo,
-      subject: 'SMTP 設定測試信',
-      text: '這是一封測試信，如果您收到這封信，代表 SMTP 設定正確！',
-      html: '<b>這是一封測試信</b>，如果您收到這封信，代表 SMTP 設定正確！',
+    await sendMicrosoftMail({
+      subject: 'Microsoft Graph 寄信測試',
+      html: '<b>這是一封測試信</b>，如果您收到這封信，代表 Microsoft Graph 寄信設定正確。',
     });
 
     return NextResponse.json({
       success: true,
       message: '測試信發送成功',
-      info: info,
       env: envCheck
     });
-
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
     console.error('測試過程發生錯誤:', error);
     return NextResponse.json({
       success: false,
       message: '測試失敗',
-      error: error.message,
-      stack: error.stack,
-      env: {
-        SMTP_HOST: process.env.SMTP_HOST,
-        SMTP_PORT: process.env.SMTP_PORT,
-        SMTP_SECURE: process.env.SMTP_SECURE,
-        SMTP_USER: process.env.SMTP_USER,
-        // 不回傳密碼
-      }
+      error: message,
+      env: getMicrosoftMailStatus()
     }, { status: 500 });
   }
 }
-

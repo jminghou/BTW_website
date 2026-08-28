@@ -144,12 +144,16 @@ export default function ContactsManager() {
     }
     if (contact.email_status === 'failed') {
       return (
-        <span
-          className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800"
-          title={contact.email_error || '郵件發送失敗'}
-        >
-          未寄出
-        </span>
+        <div className="max-w-[12rem]">
+          <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+            未寄出
+          </span>
+          {contact.email_error && (
+            <p className="mt-1 text-xs text-red-600 leading-snug" title={contact.email_error}>
+              {contact.email_error}
+            </p>
+          )}
+        </div>
       );
     }
     return (
