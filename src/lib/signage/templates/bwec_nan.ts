@@ -44,4 +44,4 @@ export const convertBwecNan = createB1Convert({
   extraInlineStyle: THREE_COL_INLINE_STYLE + SMALL_FONT_STYLE,
 });
 
-export const convertBwecNanTv = makeTvConvert(convertBwecNan, 1080, 1528);
+export const convertBwecNanTv = makeTvConvert(convertBwecNan, 1080, 1528, { keepFilename: true });

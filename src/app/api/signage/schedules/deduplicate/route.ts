@@ -4,7 +4,7 @@ import { deduplicateSchedulesBySite } from '@/lib/signage/db';
 /**
  * 一次性清理既有重複排程
  * POST /api/signage/schedules/deduplicate
- * Body: { site_id: number, keep?: 'latest' | 'oldest' }
+ * Body: { site_id: number, keep?: 'latest' | 'oldest', screen_id?: number }
  */
 export async function POST(req: NextRequest) {
   try {
@@ -12,12 +12,14 @@ export async function POST(req: NextRequest) {
     const siteId = Number(body?.site_id);
     const keepRaw = String(body?.keep || 'latest');
     const keep = keepRaw === 'oldest' ? 'oldest' : 'latest';
+    const screenIdRaw = Number(body?.screen_id);
+    const screenId = screenIdRaw && !Number.isNaN(screenIdRaw) ? screenIdRaw : undefined;
 
     if (!siteId || Number.isNaN(siteId)) {
       return NextResponse.json({ success: false, message: '缺少或無效的 site_id' }, { status: 400 });
     }
 
-    const result = await deduplicateSchedulesBySite(siteId, keep);
+    const result = await deduplicateSchedulesBySite(siteId, keep, screenId);
     if (!result.success) {
       return NextResponse.json({
         success: false,

@@ -144,4 +144,4 @@ export function convertBMedCpc(meals: MealItem[]): ConvertedMenu[] {
   return weeklyConvert(meals, (raw) => MED_LOC[raw] ?? raw, generateHtml);
 }
 
-export const convertBMedCpcTv = makeTvConvert(convertBMedCpc, 1080, 1528);
+export const convertBMedCpcTv = makeTvConvert(convertBMedCpc, 1080, 1528, { keepFilename: true });

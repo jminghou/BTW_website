@@ -45,4 +45,4 @@ export const convertBwecZub2 = createB1Convert({
   priceTransform: (p) => zub2Price(p),
 });
 
-export const convertBwecZub2Tv = makeTvConvert(convertBwecZub2, 1080, 1528);
+export const convertBwecZub2Tv = makeTvConvert(convertBwecZub2, 1080, 1528, { keepFilename: true });

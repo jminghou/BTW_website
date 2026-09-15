@@ -4,20 +4,33 @@ import { autoGenerateSchedulesFromPlaylists } from '@/lib/signage/db';
 /**
  * 一鍵列表轉排程
  * POST /api/signage/schedules/auto-generate
- * Body: { site_id: number }
+ * Body: { site_id: number, screen_id: number, mode?: 'daily' | 'weekly', playlist_ids?: number[] }
  *
- * 依該廠區播放清單內素材的檔名（*_[LDN]_YYYY-MM-DD.html）自動產生排程，
- * 為該廠區所有螢幕各建一筆，時段沿用舊系統參數。
+ * daily：依 *_[BLDN]_YYYY-MM-DD.html 排單日
+ * weekly：依 *_[BLDN]_YYYY-MM-DD_YYYY-MM-DD.html 排滿日期區間每一天
+ * 只套用到指定螢幕；playlist_ids 可再限縮要用的清單。
  */
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const siteId = Number(body?.site_id);
+    const screenId = Number(body?.screen_id);
+    const mode = body?.mode === 'weekly' ? 'weekly' : 'daily';
+    const playlistIds = Array.isArray(body?.playlist_ids)
+      ? body.playlist_ids.map(Number).filter((id: number) => Number.isFinite(id) && id > 0)
+      : undefined;
+
     if (!siteId || isNaN(siteId)) {
       return NextResponse.json({ success: false, message: '缺少或無效的 site_id' }, { status: 400 });
     }
+    if (!screenId || isNaN(screenId)) {
+      return NextResponse.json({ success: false, message: '請先選擇要產生排程的螢幕' }, { status: 400 });
+    }
 
-    const result = await autoGenerateSchedulesFromPlaylists(siteId);
+    const result = await autoGenerateSchedulesFromPlaylists(siteId, mode, {
+      screenId,
+      playlistIds,
+    });
     if (!result.success) {
       return NextResponse.json({
         success: false,

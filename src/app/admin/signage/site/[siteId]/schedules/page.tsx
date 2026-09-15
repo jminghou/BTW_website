@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { assetProxyUrl } from '@/lib/signage/assetVersion';
+import { matchFilename } from '@/lib/signage/filenameFilter';
 
 interface Schedule {
   id: number;
@@ -22,6 +23,11 @@ interface Schedule {
 type ScheduleMode = 'weekly' | 'single' | 'range';
 interface Screen { id: number; name: string }
 interface Playlist { id: number; name: string }
+
+function toId(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
 
 const WEEK_HEADERS = ['日', '一', '二', '三', '四', '五', '六'];
 const DAYS = [
@@ -91,9 +97,13 @@ export default function SiteSchedulesPage() {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [screens, setScreens] = useState<Screen[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [selectedScreenId, setSelectedScreenId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [actionMsg, setActionMsg] = useState('');
+
+  const screenStorageKey = siteId ? `signage.scheduleScreen.${siteId}` : '';
+  const selectedScreen = screens.find(s => s.id === selectedScreenId) || null;
 
   // 月曆游標
   const [cursor, setCursor] = useState(() => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), 1); });
@@ -108,6 +118,11 @@ export default function SiteSchedulesPage() {
 
   // 某日詳情
   const [dayDetail, setDayDetail] = useState<string | null>(null);
+
+  // 一鍵列表轉排程（依目前螢幕）
+  const [autoMode, setAutoMode] = useState<'daily' | 'weekly' | null>(null);
+  const [playlistFilter, setPlaylistFilter] = useState('');
+  const [pickedPlaylistIds, setPickedPlaylistIds] = useState<Set<number>>(new Set());
 
   // 餐期排程設定
   interface MealSlotRow { meal_key: 'B' | 'L' | 'D' | 'N'; start_time: string; end_time: string; enabled: boolean }
@@ -149,20 +164,46 @@ export default function SiteSchedulesPage() {
         fetch(`/api/signage/playlists?site_id=${siteId}`).then(r => r.json()),
         fetch(`/api/signage/schedules`).then(r => r.json()),
       ]);
-      const siteScreens: Screen[] = sc.success ? sc.data || [] : [];
+      const siteScreens: Screen[] = (sc.success ? sc.data || [] : [])
+        .map((s: Screen) => ({ id: toId(s.id), name: s.name }))
+        .filter(s => s.id > 0);
       setScreens(siteScreens);
       if (p.success) setPlaylists(p.data || []);
+      const stored = screenStorageKey ? toId(localStorage.getItem(screenStorageKey)) : 0;
+      setSelectedScreenId(prev => {
+        if (prev != null && siteScreens.some(s => s.id === prev)) return prev;
+        const nextId = siteScreens.some(s => s.id === stored) ? stored : (siteScreens[0]?.id ?? null);
+        if (nextId != null && screenStorageKey) localStorage.setItem(screenStorageKey, String(nextId));
+        return nextId;
+      });
       const ids = new Set(siteScreens.map(s => s.id));
       setSchedules(
         (allSched.success ? allSched.data || [] : [])
-          .filter((s: Schedule) => ids.has(s.screen_id))
-          .map(normalizeScheduleDates),
+          .map((s: Schedule) => ({ ...normalizeScheduleDates(s), screen_id: toId(s.screen_id) }))
+          .filter((s: Schedule) => ids.has(s.screen_id)),
       );
     } finally {
       setLoading(false);
     }
   };
   useEffect(() => { load(); }, [siteId]);
+
+  const selectScreen = (id: number) => {
+    setSelectedScreenId(id);
+    if (screenStorageKey) localStorage.setItem(screenStorageKey, String(id));
+    setDayDetail(null);
+    setActionMsg('');
+  };
+
+  const visibleSchedules = useMemo(
+    () => selectedScreenId == null ? [] : schedules.filter(s => s.screen_id === selectedScreenId),
+    [schedules, selectedScreenId],
+  );
+
+  const filteredPlaylists = useMemo(
+    () => playlists.filter(p => matchFilename(p.name, playlistFilter)),
+    [playlists, playlistFilter],
+  );
 
   // ---- 月曆格子 (6 週 42 格) ----
   const grid = useMemo(() => {
@@ -185,7 +226,7 @@ export default function SiteSchedulesPage() {
     const weekdayIncludes = (s: Schedule) => {
       try { return (JSON.parse(s.days_of_week) as number[]).includes(wd); } catch { return false; }
     };
-    return schedules
+    return visibleSchedules
       .filter(s => {
         const pd = s.play_date ? s.play_date.substring(0, 10) : null;
         if (pd) return pd === ds; // 特定單日
@@ -197,20 +238,64 @@ export default function SiteSchedulesPage() {
       .sort((a, b) => a.start_time.localeCompare(b.start_time));
   };
 
-  // ---- 一鍵列表轉排程 ----
+  // ---- 一鍵列表轉排程（日／週，只套目前這台螢幕） ----
+  const openAutoGenerate = (mode: 'daily' | 'weekly') => {
+    setAutoMode(mode);
+    setPlaylistFilter('');
+    setPickedPlaylistIds(new Set(playlists.map(p => p.id)));
+  };
+
+  const togglePickedPlaylist = (id: number) => {
+    setPickedPlaylistIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const selectFilteredPlaylists = () => {
+    setPickedPlaylistIds(prev => {
+      const next = new Set(prev);
+      filteredPlaylists.forEach(p => next.add(p.id));
+      return next;
+    });
+  };
+
+  const deselectFilteredPlaylists = () => {
+    setPickedPlaylistIds(prev => {
+      const next = new Set(prev);
+      filteredPlaylists.forEach(p => next.delete(p.id));
+      return next;
+    });
+  };
+
   const handleAutoGenerate = async () => {
-    if (!siteId) return;
-    if (!confirm('將依播放清單內素材的檔名（如 F3_L_2026-05-25）自動判斷餐期與日期，為本廠區所有螢幕產生排程。確定嗎？')) return;
+    if (!siteId || !selectedScreenId || !autoMode) return;
+    const playlist_ids = playlists
+      .filter(p => pickedPlaylistIds.has(p.id))
+      .map(p => p.id);
+    if (playlist_ids.length === 0) {
+      alert('請至少選擇一個播放清單');
+      return;
+    }
     setBusy(true);
     setActionMsg('');
     try {
       const res = await fetch('/api/signage/schedules/auto-generate', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ site_id: Number(siteId) }),
+        body: JSON.stringify({
+          site_id: Number(siteId),
+          screen_id: selectedScreenId,
+          mode: autoMode,
+          playlist_ids,
+        }),
       });
       const json = await res.json();
       setActionMsg(json.message || (json.success ? '完成' : '失敗'));
-      if (json.success) await load();
+      if (json.success) {
+        setAutoMode(null);
+        await load();
+      }
     } catch {
       setActionMsg('網路錯誤');
     } finally {
@@ -219,7 +304,7 @@ export default function SiteSchedulesPage() {
   };
 
   const handleDeduplicate = async () => {
-    if (!siteId) return;
+    if (!siteId || !selectedScreenId) return;
     const picked = (prompt('請輸入保留方式：latest（保留最新）或 oldest（保留最舊）', 'latest') || '').trim().toLowerCase();
     if (!picked) return;
     if (picked !== 'latest' && picked !== 'oldest') {
@@ -227,7 +312,7 @@ export default function SiteSchedulesPage() {
       return;
     }
     const keepLabel = picked === 'latest' ? '最新' : '最舊';
-    if (!confirm(`將清理本廠區重複排程，並保留${keepLabel}一筆。確定執行嗎？`)) return;
+    if (!confirm(`將清理「${selectedScreen?.name || '目前螢幕'}」的重複排程，並保留${keepLabel}一筆。確定執行嗎？`)) return;
 
     setBusy(true);
     setActionMsg('');
@@ -235,7 +320,7 @@ export default function SiteSchedulesPage() {
       const res = await fetch('/api/signage/schedules/deduplicate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ site_id: Number(siteId), keep: picked }),
+        body: JSON.stringify({ site_id: Number(siteId), keep: picked, screen_id: selectedScreenId }),
       });
       const json = await res.json();
       setActionMsg(json.message || (json.success ? '清理完成' : '清理失敗'));
@@ -251,7 +336,7 @@ export default function SiteSchedulesPage() {
   const openNew = (prefillDate?: string) => {
     setEditing(null);
     setForm({
-      screen_id: screens[0]?.id?.toString() || '',
+      screen_id: (selectedScreenId ?? screens[0]?.id)?.toString() || '',
       playlist_id: playlists[0]?.id?.toString() || '',
       start_time: '08:00', end_time: '18:00',
       days_of_week: prefillDate ? [isoWeekday(new Date(prefillDate))] : [1, 2, 3, 4, 5],
@@ -359,15 +444,27 @@ export default function SiteSchedulesPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <button onClick={() => openNew()} disabled={screens.length === 0 || playlists.length === 0}
+          <button onClick={() => openNew()} disabled={!selectedScreenId || playlists.length === 0}
             className="bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium">
             新增排程
           </button>
-          <button onClick={handleAutoGenerate} disabled={busy || screens.length === 0}
-            className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium">
-            一鍵列表轉排程
-          </button>
-          <button onClick={handleDeduplicate} disabled={busy}
+          <label className="relative inline-flex">
+            <select
+              disabled={busy || !selectedScreenId}
+              value=""
+              onChange={e => {
+                const mode = e.target.value;
+                if (mode === 'daily' || mode === 'weekly') openAutoGenerate(mode);
+              }}
+              className="appearance-none bg-white border-2 border-green-600 text-green-700 hover:bg-green-50 disabled:opacity-50 pl-4 pr-9 py-2 rounded-lg text-sm font-medium cursor-pointer"
+            >
+              <option value="" disabled>一鍵列表轉排程</option>
+              <option value="daily">一鍵轉日排程</option>
+              <option value="weekly">一鍵轉週排程</option>
+            </select>
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-green-700 text-xs">▼</span>
+          </label>
+          <button onClick={handleDeduplicate} disabled={busy || !selectedScreenId}
             className="bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium">
             清理重複排程
           </button>
@@ -393,8 +490,41 @@ export default function SiteSchedulesPage() {
         </div>
       )}
 
-      <div className="bg-white border border-gray-200 rounded-lg px-5 py-4">
-        <h2 className="text-2xl font-bold text-gray-800">{monthLabel}</h2>
+      <div className="bg-white border border-gray-200 rounded-lg px-5 py-4 space-y-3">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-800">{monthLabel}</h2>
+          <p className="text-sm text-gray-500 mt-1">
+            {selectedScreen ? `目前月曆：${selectedScreen.name}` : '請先選擇要查看的螢幕'}
+          </p>
+        </div>
+        {screens.length > 0 ? (
+          <div>
+            <div className="text-xs font-medium text-gray-500 mb-2">選擇螢幕（每台獨立一張月曆）</div>
+            <div className="flex flex-wrap gap-2">
+              {screens.map(s => {
+                const active = s.id === selectedScreenId;
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => selectScreen(s.id)}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                      active
+                        ? 'bg-cyan-600 text-white border-cyan-600 shadow-sm'
+                        : 'bg-cyan-50 text-cyan-800 border-cyan-200 hover:bg-cyan-100'
+                    }`}
+                  >
+                    {s.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : !loading && (
+          <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            此廠區尚無螢幕，請先到「螢幕管理」新增。
+          </p>
+        )}
       </div>
 
       {/* 月曆 */}
@@ -448,9 +578,13 @@ export default function SiteSchedulesPage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">螢幕 *</label>
                   <select required value={form.screen_id} onChange={e => setForm({ ...form, screen_id: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500">
+                    disabled={!editing}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 disabled:bg-gray-100">
                     {screens.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
+                  {!editing && (
+                    <p className="text-xs text-gray-400 mt-1">新增時固定為上方選中的螢幕</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">播放清單 *</label>
@@ -587,9 +721,70 @@ export default function SiteSchedulesPage() {
             <div className="border-t pt-4">
               <button
                 onClick={() => { const d = dayDetail; setDayDetail(null); openNew(d); }}
-                disabled={screens.length === 0 || playlists.length === 0}
+                disabled={!selectedScreenId || playlists.length === 0}
                 className="bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium">
                 + 在這天新增排程
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 一鍵列表轉排程 modal */}
+      {autoMode && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] p-4" onClick={() => !busy && setAutoMode(null)}>
+          <div className="bg-white rounded-xl max-w-lg w-full max-h-[85vh] overflow-y-auto p-6 space-y-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">
+                {autoMode === 'weekly' ? '一鍵轉週排程' : '一鍵轉日排程'}
+              </h2>
+              <button onClick={() => !busy && setAutoMode(null)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
+            </div>
+            <p className="text-sm text-gray-600">
+              只會套用到「<span className="font-medium text-gray-800">{selectedScreen?.name}</span>」，不會影響其他螢幕。
+            </p>
+            <p className="text-xs text-gray-400">
+              {autoMode === 'weekly'
+                ? '依檔名區間判斷，例如 F3_L_2026-09-14_2026-09-18。'
+                : '依檔名日期判斷，例如 F3_L_2026-09-14。'}
+              可再用名稱篩選，只轉這台螢幕要播的清單。
+            </p>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">清單名稱篩選</label>
+              <input
+                value={playlistFilter}
+                onChange={e => setPlaylistFilter(e.target.value)}
+                placeholder="例如 F3 或 L，空白則顯示全部"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500"
+              />
+            </div>
+            <div className="flex items-center justify-between text-xs text-gray-500">
+              <span>已選 {playlists.filter(p => pickedPlaylistIds.has(p.id)).length} / {playlists.length} 筆</span>
+              <div className="flex gap-2">
+                <button type="button" onClick={selectFilteredPlaylists} className="text-cyan-700 hover:underline">全選目前篩選</button>
+                <button type="button" onClick={deselectFilteredPlaylists} className="text-gray-500 hover:underline">取消目前篩選</button>
+              </div>
+            </div>
+            <div className="max-h-56 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
+              {filteredPlaylists.length === 0 ? (
+                <p className="text-sm text-gray-400 p-3 text-center">沒有符合的播放清單</p>
+              ) : filteredPlaylists.map(p => (
+                <label key={p.id} className="flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={pickedPlaylistIds.has(p.id)}
+                    onChange={() => togglePickedPlaylist(p.id)}
+                  />
+                  <span className="truncate">{p.name}</span>
+                </label>
+              ))}
+            </div>
+            <div className="flex justify-end gap-2 border-t pt-4">
+              <button type="button" disabled={busy} onClick={() => setAutoMode(null)}
+                className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium">取消</button>
+              <button type="button" disabled={busy} onClick={handleAutoGenerate}
+                className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                {busy ? '產生中...' : '開始產生'}
               </button>
             </div>
           </div>
@@ -605,7 +800,7 @@ export default function SiteSchedulesPage() {
               <button onClick={() => setShowMealSlots(false)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
             </div>
             <p className="text-sm text-gray-500">
-              「一鍵列表轉排程」會依檔名餐期（B/L/D/N）對應到下列時段。結束時間若早於開始時間，視為**跨日**（自動拆成當日與隔日兩段，適合宵夜）。
+              「一鍵轉日排程／一鍵轉週排程」會依檔名餐期（B/L/D/N）對應到下列時段，並只套用到你目前選中的那台螢幕。結束時間若早於開始時間，視為**跨日**（自動拆成當日與隔日兩段，適合宵夜）。
             </p>
 
             <div className="space-y-2">

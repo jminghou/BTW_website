@@ -73,17 +73,19 @@ export function toTvHtml(html: string, designW: number, designH: number): string
 
 /**
  * 由一個既有的 convert 函式衍生出對應的「電視版」convert 函式：
- * 內容完全相同，只是外層套上等比縮放、檔名加 _TV。
+ * 內容完全相同，只是外層套上等比縮放。
+ * 預設檔名加 _TV；週菜單 EDM 已改用簡寫檔名，請傳 keepFilename 以免再加後綴。
  */
 export function makeTvConvert<M, T extends { filename: string; html: string }>(
   base: (meals: M) => T[],
   designW: number,
   designH: number,
+  opts?: { keepFilename?: boolean },
 ): (meals: M) => T[] {
   return (meals: M) =>
     base(meals).map((m) => ({
       ...m,
-      filename: m.filename.replace(/\.html$/, '_TV.html'),
+      filename: opts?.keepFilename ? m.filename : m.filename.replace(/\.html$/, '_TV.html'),
       html: toTvHtml(m.html, designW, designH),
     }));
 }

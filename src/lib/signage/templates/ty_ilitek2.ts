@@ -37,4 +37,4 @@ export const convertTyIlitek2 = createB1Convert({
   noWeekdayFilter: true,
 });
 
-export const convertTyIlitek2Tv = makeTvConvert(convertTyIlitek2, 1080, 1528);
+export const convertTyIlitek2Tv = makeTvConvert(convertTyIlitek2, 1080, 1528, { keepFilename: true });

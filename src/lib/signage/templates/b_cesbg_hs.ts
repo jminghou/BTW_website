@@ -29,4 +29,4 @@ export const convertBCesbgHs = createB1Convert({
   emptyDayHeight: 180,
 });
 
-export const convertBCesbgHsTv = makeTvConvert(convertBCesbgHs, 1080, 1528);
+export const convertBCesbgHsTv = makeTvConvert(convertBCesbgHs, 1080, 1528, { keepFilename: true });

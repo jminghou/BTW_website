@@ -29,4 +29,4 @@ export const convertBHonhaiKh = createB1Convert({
   emptyDayHeight: 180,
 });
 
-export const convertBHonhaiKhTv = makeTvConvert(convertBHonhaiKh, 1080, 1528);
+export const convertBHonhaiKhTv = makeTvConvert(convertBHonhaiKh, 1080, 1528, { keepFilename: true });

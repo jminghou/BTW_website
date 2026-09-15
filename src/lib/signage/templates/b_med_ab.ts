@@ -35,4 +35,4 @@ export const convertBMedAb = createB1Convert({
   combinePeriods: true,
 });
 
-export const convertBMedAbTv = makeTvConvert(convertBMedAb, 1080, 1528);
+export const convertBMedAbTv = makeTvConvert(convertBMedAb, 1080, 1528, { keepFilename: true });

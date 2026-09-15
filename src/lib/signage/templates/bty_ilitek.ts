@@ -47,4 +47,4 @@ export const convertBtyIlitek = createB1Convert({
   emptyDayHeight: 120,
 });
 
-export const convertBtyIlitekTv = makeTvConvert(convertBtyIlitek, 1080, 1528);
+export const convertBtyIlitekTv = makeTvConvert(convertBtyIlitek, 1080, 1528, { keepFilename: true });

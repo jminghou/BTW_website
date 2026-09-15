@@ -1218,10 +1218,14 @@ function buildSegments(start: string, end: string): { start: string; end: string
  * 一鍵列表轉排程：依播放清單內素材的檔名自動產生排程
  * 對應 v2.0 admin.py auto_generate_schedules，但時段改讀「各廠區餐期設定」。
  *
- * 檔名格式：*_([BLDN])_(YYYY-MM-DD).html，只處理該廠區「已啟用」的餐期。
+ * 檔名格式：
+ *   日排程 *_([BLDN])_(YYYY-MM-DD).html，只排那一天
+ *   週排程 *_([BLDN])_(YYYY-MM-DD)_(YYYY-MM-DD).html，排滿區間每一天
+ *   只處理該廠區「已啟用」的餐期。
  *   時段依 signage_meal_slots；結束<=開始自動跨日拆兩段。
  *   play_date = 檔名日期（跨日段為隔日）；days_of_week = [該日 isoweekday]
- * 為該廠區所有螢幕各建一筆；同 (screen,playlist,days,start,end) 已存在則跳過或補填 play_date。
+ * 只為指定螢幕建排程；同 (screen,playlist,days,start,end,play_date) 已存在則跳過或補填 play_date。
+ * 可選 playlistIds：只轉這些清單，未提供則用該廠區全部清單。
  */
 function isoWeekdayLocal(dateStr: string): number {
   const [y, m, d] = dateStr.split('-').map(Number);
@@ -1269,42 +1273,86 @@ function normalizeDbDate(val: unknown): string | null {
   return s.length >= 10 ? s.substring(0, 10) : s;
 }
 
+type MealKey = 'B' | 'L' | 'D' | 'N';
+
+function mealKeyFromZh(label: string): MealKey {
+  return label === '早餐' || label === '早' ? 'B'
+    : label === '午餐' || label === '午' ? 'L'
+      : label === '晚餐' || label === '晚' ? 'D'
+        : 'N';
+}
+
 /**
- * 從檔名或清單名解析餐期與日期。
+ * 從檔名或清單名解析餐期與「單日」日期（一鍵轉日排程）。
  * 支援：
  *  - F3_L_2026-06-24.html
  *  - F3_L_2026-06-24_TV.html
  *  - F3_午餐_2026-06-24.html
+ * 區間檔名（F3_L_2026-09-14_2026-09-18.html）只會取第一個日期，維持既有行為。
  */
-function parseMealAndDate(raw: string): { mealKey: 'B' | 'L' | 'D' | 'N'; date: string } | null {
+function parseMealAndDate(raw: string): { mealKey: MealKey; date: string } | null {
   const text = String(raw || '').trim();
   if (!text) return null;
 
   // 先處理最常見格式：_B/L/D/N_YYYY-MM-DD（後方允許有尾碼）
   const alpha = text.match(/(?:^|_)([BLDN])_(\d{4}-\d{2}-\d{2})(?:$|[_\-.])/i);
   if (alpha) {
-    return { mealKey: alpha[1].toUpperCase() as 'B' | 'L' | 'D' | 'N', date: alpha[2] };
+    return { mealKey: alpha[1].toUpperCase() as MealKey, date: alpha[2] };
   }
 
   // 兼容中文餐期名稱
   const zh = text.match(/(?:^|_)(早餐|午餐|晚餐|宵夜|早|午|晚|宵)_(\d{4}-\d{2}-\d{2})(?:$|[_\-.])/);
   if (!zh) return null;
-  const label = zh[1];
-  const mealKey: 'B' | 'L' | 'D' | 'N' =
-    label === '早餐' || label === '早' ? 'B'
-      : label === '午餐' || label === '午' ? 'L'
-        : label === '晚餐' || label === '晚' ? 'D'
-          : 'N';
-  return { mealKey, date: zh[2] };
+  return { mealKey: mealKeyFromZh(zh[1]), date: zh[2] };
 }
 
-export async function autoGenerateSchedulesFromPlaylists(siteId: number) {
+/**
+ * 從檔名或清單名解析餐期與「日期區間」（一鍵轉週排程）。
+ * 必須是 第一天_最後一天，例：F3_L_2026-09-14_2026-09-18.html
+ */
+function parseMealAndDateRange(raw: string): { mealKey: MealKey; startDate: string; endDate: string } | null {
+  const text = String(raw || '').trim();
+  if (!text) return null;
+
+  const alpha = text.match(/(?:^|_)([BLDN])_(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})(?:$|[_\-.])/i);
+  if (alpha) {
+    return { mealKey: alpha[1].toUpperCase() as MealKey, startDate: alpha[2], endDate: alpha[3] };
+  }
+
+  const zh = text.match(/(?:^|_)(早餐|午餐|晚餐|宵夜|早|午|晚|宵)_(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})(?:$|[_\-.])/);
+  if (!zh) return null;
+  return { mealKey: mealKeyFromZh(zh[1]), startDate: zh[2], endDate: zh[3] };
+}
+
+/** 列出含首尾的每一天；起迄顛倒或超過 62 天則回空陣列 */
+function enumerateDates(start: string, end: string): string[] {
+  if (!start || !end || start > end) return [];
+  const out: string[] = [];
+  let cur = start;
+  while (cur <= end) {
+    out.push(cur);
+    if (out.length >= 62) break;
+    cur = addOneDay(cur);
+  }
+  return out;
+}
+
+export async function autoGenerateSchedulesFromPlaylists(
+  siteId: number,
+  mode: 'daily' | 'weekly' = 'daily',
+  options?: { screenId?: number; playlistIds?: number[] },
+) {
   try {
-    // 該廠區所有螢幕
-    const screens = await sql`SELECT id FROM signage_screens WHERE site_id = ${siteId};`;
-    const screenIds = (screens as Array<{ id: number }>).map(s => s.id);
-    if (screenIds.length === 0) {
-      return { success: false, error: '此廠區尚無螢幕，請先建立螢幕' };
+    const screenId = Number(options?.screenId);
+    if (!screenId || Number.isNaN(screenId)) {
+      return { success: false, error: '請指定要產生排程的螢幕' };
+    }
+
+    const screens = await sql`
+      SELECT id FROM signage_screens WHERE site_id = ${siteId} AND id = ${screenId};
+    `;
+    if ((screens as Array<{ id: number }>).length === 0) {
+      return { success: false, error: '找不到指定螢幕，或該螢幕不屬於此廠區' };
     }
 
     // 該廠區的餐期設定 → 建立「啟用餐期 → 時段」對照
@@ -1320,24 +1368,41 @@ export async function autoGenerateSchedulesFromPlaylists(siteId: number) {
       return { success: false, error: '目前餐期排程全部停用，請先到「餐期排程」啟用至少一個餐期' };
     }
 
-    // 該廠區所有播放清單內的素材檔名
-    const rows = await sql`
-      SELECT pi.playlist_id, a.filename, p.name AS playlist_name
-      FROM signage_playlist_items pi
-      JOIN signage_assets a ON pi.asset_id = a.id
-      JOIN signage_playlists p ON pi.playlist_id = p.id
-      WHERE p.site_id = ${siteId};
-    `;
+    // 指定清單（或該廠區全部清單）內的素材檔名
+    const hasPlaylistFilter = Array.isArray(options?.playlistIds);
+    const playlistIds = (options?.playlistIds || [])
+      .map(Number)
+      .filter(id => Number.isFinite(id) && id > 0);
+    if (hasPlaylistFilter && playlistIds.length === 0) {
+      return { success: false, error: '請至少選擇一個播放清單' };
+    }
+    const rows = playlistIds.length > 0
+      ? await sql`
+          SELECT pi.playlist_id, a.filename, p.name AS playlist_name
+          FROM signage_playlist_items pi
+          JOIN signage_assets a ON pi.asset_id = a.id
+          JOIN signage_playlists p ON pi.playlist_id = p.id
+          WHERE p.site_id = ${siteId} AND p.id = ANY(${playlistIds});
+        `
+      : await sql`
+          SELECT pi.playlist_id, a.filename, p.name AS playlist_name
+          FROM signage_playlist_items pi
+          JOIN signage_assets a ON pi.asset_id = a.id
+          JOIN signage_playlists p ON pi.playlist_id = p.id
+          WHERE p.site_id = ${siteId};
+        `;
     if (rows.length === 0) {
-      return { success: false, error: '此廠區播放清單尚未加入素材，無法自動產生排程' };
+      return { success: false, error: playlistIds.length > 0
+        ? '所選播放清單尚未加入素材，無法自動產生排程'
+        : '此廠區播放清單尚未加入素材，無法自動產生排程' };
     }
 
-    // 該廠區既有排程（用於去重/補填）
+    // 該螢幕既有排程（用於去重/補填）
     const existingRows = await sql`
       SELECT s.id, s.screen_id, s.playlist_id, s.start_time, s.end_time, s.days_of_week, s.play_date
       FROM signage_schedules s
       JOIN signage_screens sc ON s.screen_id = sc.id
-      WHERE sc.site_id = ${siteId};
+      WHERE sc.site_id = ${siteId} AND s.screen_id = ${screenId};
     `;
     const norm = (t: unknown) => String(t).substring(0, 8); // "HH:MM:SS"
     const existingExact = new Set<string>();
@@ -1359,18 +1424,28 @@ export async function autoGenerateSchedulesFromPlaylists(siteId: number) {
     const plannedExact = new Set<string>(existingExact);
 
     for (const row of rows as Array<{ playlist_id: number; filename: string; playlist_name: string }>) {
-      const parsed = parseMealAndDate(row.filename) ?? parseMealAndDate(row.playlist_name);
-      if (!parsed) continue;
+      let mealKey: MealKey | null = null;
+      let dates: string[] = [];
+      if (mode === 'weekly') {
+        const parsed = parseMealAndDateRange(row.filename) ?? parseMealAndDateRange(row.playlist_name);
+        if (!parsed) continue;
+        mealKey = parsed.mealKey;
+        dates = enumerateDates(parsed.startDate, parsed.endDate);
+      } else {
+        const parsed = parseMealAndDate(row.filename) ?? parseMealAndDate(row.playlist_name);
+        if (!parsed) continue;
+        mealKey = parsed.mealKey;
+        dates = [parsed.date];
+      }
+      if (!mealKey || dates.length === 0) continue;
       parseable++;
-      const slot = parsed.mealKey;
-      const baseDate = parsed.date;
-      const segments = slotSegments.get(slot); // 只處理已啟用的餐期
+      const segments = slotSegments.get(mealKey); // 只處理已啟用的餐期
       if (!segments) continue;
 
-      for (const seg of segments) {
-        const playDate = seg.nextDay ? addOneDay(baseDate) : baseDate;
-        const daysJson = JSON.stringify([isoWeekdayLocal(playDate)]);
-        for (const screenId of screenIds) {
+      for (const baseDate of dates) {
+        for (const seg of segments) {
+          const playDate = seg.nextDay ? addOneDay(baseDate) : baseDate;
+          const daysJson = JSON.stringify([isoWeekdayLocal(playDate)]);
           const baseKey = `${screenId}|${row.playlist_id}|${daysJson}|${seg.start}|${seg.end}`;
           const exactKey = `${baseKey}|${playDate}`;
           if (plannedExact.has(exactKey)) {
@@ -1396,7 +1471,9 @@ export async function autoGenerateSchedulesFromPlaylists(siteId: number) {
     if (parseable === 0) {
       return {
         success: false,
-        error: '找不到可解析的餐期/日期格式。請確認檔名或清單名包含例如「F3_L_2026-06-24」',
+        error: mode === 'weekly'
+          ? '找不到可解析的週區間檔名。請確認檔名或清單名包含例如「F3_L_2026-09-14_2026-09-18」'
+          : '找不到可解析的餐期/日期格式。請確認檔名或清單名包含例如「F3_L_2026-06-24」',
       };
     }
 
@@ -1595,11 +1672,13 @@ export async function deleteSchedule(id: number) {
 export async function deduplicateSchedulesBySite(
   siteId: number,
   keep: 'latest' | 'oldest' = 'latest',
+  screenId?: number,
 ) {
   try {
     const orderBy = keep === 'oldest'
       ? 's.created_at ASC NULLS LAST, s.id ASC'
       : 's.created_at DESC NULLS LAST, s.id DESC';
+    const scopedScreenId = screenId && Number.isFinite(screenId) ? screenId : null;
 
     const deletedRows = await sql.query(
       `
@@ -1608,6 +1687,7 @@ export async function deduplicateSchedulesBySite(
         FROM signage_schedules s
         JOIN signage_screens sc ON sc.id = s.screen_id
         WHERE sc.site_id = $1
+          AND ($2::int IS NULL OR s.screen_id = $2)
       ),
       ranked AS (
         SELECT
@@ -1632,7 +1712,7 @@ export async function deduplicateSchedulesBySite(
         AND r.rn > 1
       RETURNING d.id;
       `,
-      [siteId],
+      [siteId, scopedScreenId],
     ) as Array<{ id: number }>;
 
     return {

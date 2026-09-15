@@ -12,6 +12,8 @@
  * CSS 與上傳資料無關，已預先產生為 public/signage-assets/css/<key>.css。
  */
 
+import { weeklyEdmFilename } from './_weeklyFilename';
+
 export interface MealItem {
   餐點名稱: string;
   英文名稱?: string | null;
@@ -540,7 +542,7 @@ export function weeklyConvert(
     const buckets: Array<{ items: MealItem[]; start: string; end: string }> = [];
     if (noWeekSplit) {
       const ds = Array.from(new Set(items.map((i) => i.日期))).sort();
-      buckets.push({ items, start: fmtMmdd(dateToObj(ds[0])), end: fmtMmdd(dateToObj(ds[ds.length - 1])) });
+      buckets.push({ items, start: fmtYmd(dateToObj(ds[0])), end: fmtYmd(dateToObj(ds[ds.length - 1])) });
     } else {
       const weeks = new Map<string, MealItem[]>();
       for (const item of items) {
@@ -551,15 +553,13 @@ export function weeklyConvert(
       }
       for (const wk of Array.from(weeks.keys()).sort()) {
         const monday = dateToObj(wk);
-        buckets.push({ items: weeks.get(wk)!, start: fmtMmdd(monday), end: fmtMmdd(addDays(monday, 4)) });
+        buckets.push({ items: weeks.get(wk)!, start: fmtYmd(monday), end: fmtYmd(addDays(monday, 4)) });
       }
     }
 
     for (const { items: weekItems, start, end } of buckets) {
       // 合併午晚餐時檔名不含時段（對應舊版 json_lunch_dinner 命名）
-      const filename = combinePeriods
-        ? `${rawLocation}_${start}_${end}.html`
-        : `${rawLocation}_${mealTime}_${start}_${end}.html`;
+      const filename = weeklyEdmFilename(rawLocation, combinePeriods ? '' : mealTime, start, end);
       result.push({
         filename,
         html: genHtml(weekItems),

@@ -187,4 +187,4 @@ export function convertBCesbgTu(meals: MealItem[]): ConvertedMenu[] {
   return weeklyConvert(meals, () => LOCATION, generateHtml);
 }
 
-export const convertBCesbgTuTv = makeTvConvert(convertBCesbgTu, 1080, 1528);
+export const convertBCesbgTuTv = makeTvConvert(convertBCesbgTu, 1080, 1528, { keepFilename: true });

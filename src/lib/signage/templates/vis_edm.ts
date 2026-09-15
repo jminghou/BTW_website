@@ -18,6 +18,7 @@
  */
 
 import { makeTvConvert } from './_tv';
+import { weeklyEdmFilename } from './_weeklyFilename';
 
 export interface MealItem {
   餐點名稱: string;
@@ -33,12 +34,12 @@ export interface MealItem {
 }
 
 export interface ConvertedMenu {
-  filename: string; // 例：世界先進三廠 fab3_午餐_06-08_06-12.html
+  filename: string; // 例：F3_L_2026-06-08_2026-06-12.html
   html: string;
   meta: {
     location: string; // FAB 3
     mealTime: string; // 午餐
-    date: string; // 06-08_06-12（一週區間）
+    date: string; // 2026-06-08_2026-06-12（一週區間）
     itemCount: number;
     warnings: string[];
   };
@@ -138,9 +139,6 @@ function pyWeekday(dt: Date): number {
 }
 function fmtYmd(dt: Date): string {
   return `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
-}
-function fmtMmdd(dt: Date): string {
-  return `${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
 }
 function addDays(dt: Date, n: number): Date {
   return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate() + n);
@@ -486,11 +484,11 @@ export function convertVisEdm(meals: MealItem[]): ConvertedMenu[] {
           else seq.push(createEmptyRecord(ymd, PY_WEEKDAY_EN[offset]));
         }
 
-        const start = fmtMmdd(monday);
-        const end = fmtMmdd(addDays(monday, 4));
+        const start = fmtYmd(monday);
+        const end = fmtYmd(addDays(monday, 4));
         const { html, warnings } = generateMenuHtml(seq);
         result.push({
-          filename: `${rawLocation}_${mealTime}_${start}_${end}.html`,
+          filename: weeklyEdmFilename(rawLocation, mealTime, start, end),
           html,
           meta: {
             location: convertLocationName(rawLocation),
@@ -519,11 +517,11 @@ export function convertVisEdm(meals: MealItem[]): ConvertedMenu[] {
           else seq.push(createEmptyRecord(ymd, PY_WEEKDAY_EN[pyWeekday(dt)]));
         }
 
-        const start = fmtMmdd(sat);
-        const end = fmtMmdd(sun);
+        const start = fmtYmd(sat);
+        const end = fmtYmd(sun);
         const { html, warnings } = generateMenuHtml(seq);
         result.push({
-          filename: `${rawLocation}_${mealTime}_${start}_${end}_weekend.html`,
+          filename: weeklyEdmFilename(rawLocation, mealTime, start, end, 'weekend'),
           html,
           meta: {
             location: convertLocationName(rawLocation),
@@ -540,4 +538,4 @@ export function convertVisEdm(meals: MealItem[]): ConvertedMenu[] {
   return result;
 }
 
-export const convertVisEdmTv = makeTvConvert(convertVisEdm, 1920, 1080);
+export const convertVisEdmTv = makeTvConvert(convertVisEdm, 1920, 1080, { keepFilename: true });

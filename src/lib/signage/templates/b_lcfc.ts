@@ -31,4 +31,4 @@ export const convertBLcfc = createB1Convert({
   extraInlineStyle: THREE_COL_INLINE_STYLE,
 });
 
-export const convertBLcfcTv = makeTvConvert(convertBLcfc, 1080, 1528);
+export const convertBLcfcTv = makeTvConvert(convertBLcfc, 1080, 1528, { keepFilename: true });

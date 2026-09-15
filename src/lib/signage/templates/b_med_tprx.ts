@@ -159,4 +159,4 @@ export function convertBMedTprx(meals: MealItem[]): ConvertedMenu[] {
   return weeklyConvert(meals, (raw) => TPRX_LOC[raw] ?? raw, generateHtml);
 }
 
-export const convertBMedTprxTv = makeTvConvert(convertBMedTprx, 1080, 1528);
+export const convertBMedTprxTv = makeTvConvert(convertBMedTprx, 1080, 1528, { keepFilename: true });

@@ -16,9 +16,9 @@ import {
   dateToObj,
   pyWeekday,
   fmtYmd,
-  fmtMmdd,
   addDays,
 } from './_b_h1_common';
+import { weeklyEdmFilename } from './_weeklyFilename';
 
 const LOCATION_MAP: Record<string, string> = {
   南港辦公室: '南港辦公室',
@@ -293,10 +293,10 @@ export function convertBwecZub(meals: MealItem[]): ConvertedMenu[] {
         else seq.push(createEmptyRecord(ymd, PY_WEEKDAY_EN[offset]));
       }
 
-      const start = fmtMmdd(monday);
-      const end = fmtMmdd(addDays(monday, 4));
+      const start = fmtYmd(monday);
+      const end = fmtYmd(addDays(monday, 4));
       result.push({
-        filename: `${rawLocation}_${mealTime}_${start}_${end}.html`,
+        filename: weeklyEdmFilename(rawLocation, mealTime, start, end),
         html: generateMenuHtml(seq),
         meta: {
           location: LOCATION_MAP[rawLocation] ?? rawLocation,
@@ -312,4 +312,4 @@ export function convertBwecZub(meals: MealItem[]): ConvertedMenu[] {
 }
 
 import { makeTvConvert } from './_tv';
-export const convertBwecZubTv = makeTvConvert(convertBwecZub, 1920, 1080);
+export const convertBwecZubTv = makeTvConvert(convertBwecZub, 1920, 1080, { keepFilename: true });

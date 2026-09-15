@@ -33,4 +33,4 @@ export const convertBtyRichtek = createB1Convert({
   itemFilter: BTY_DRINK_FILTER,
 });
 
-export const convertBtyRichtekTv = makeTvConvert(convertBtyRichtek, 1080, 1528);
+export const convertBtyRichtekTv = makeTvConvert(convertBtyRichtek, 1080, 1528, { keepFilename: true });

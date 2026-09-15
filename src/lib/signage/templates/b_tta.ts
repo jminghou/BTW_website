@@ -31,4 +31,4 @@ export const convertBTta = createB1Convert({
   emptyDayHeight: 180,
 });
 
-export const convertBTtaTv = makeTvConvert(convertBTta, 1080, 1528);
+export const convertBTtaTv = makeTvConvert(convertBTta, 1080, 1528, { keepFilename: true });

@@ -30,4 +30,4 @@ export const convertBMedTna = createB1Convert({
   emptyDayHeight: 180,
 });
 
-export const convertBMedTnaTv = makeTvConvert(convertBMedTna, 1080, 1528);
+export const convertBMedTnaTv = makeTvConvert(convertBMedTna, 1080, 1528, { keepFilename: true });

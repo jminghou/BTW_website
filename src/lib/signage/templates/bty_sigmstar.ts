@@ -32,4 +32,4 @@ export const convertBtySigmstar = createB1Convert({
   itemFilter: BTY_DRINK_FILTER,
 });
 
-export const convertBtySigmstarTv = makeTvConvert(convertBtySigmstar, 1080, 1528);
+export const convertBtySigmstarTv = makeTvConvert(convertBtySigmstar, 1080, 1528, { keepFilename: true });

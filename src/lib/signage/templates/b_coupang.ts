@@ -32,4 +32,4 @@ export const convertBCoupang = createB1Convert({
   extraInlineStyle: THREE_COL_INLINE_STYLE,
 });
 
-export const convertBCoupangTv = makeTvConvert(convertBCoupang, 1080, 1528);
+export const convertBCoupangTv = makeTvConvert(convertBCoupang, 1080, 1528, { keepFilename: true });
