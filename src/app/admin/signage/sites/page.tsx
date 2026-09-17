@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { getRegionLabel } from '@/lib/signage/regionLabel';
 
 interface Site {
   id: number;
@@ -14,16 +15,40 @@ interface Site {
 interface Region {
   id: number;
   name: string;
+  description: string | null;
+}
+
+function readRegionIdFromUrl(): number | null {
+  if (typeof window === 'undefined') return null;
+  const id = Number(new URLSearchParams(window.location.search).get('region_id'));
+  return Number.isFinite(id) && id > 0 ? id : null;
 }
 
 export default function SitesPage() {
   const [sites, setSites] = useState<Site[]>([]);
   const [regions, setRegions] = useState<Region[]>([]);
+  const [scopedRegionId, setScopedRegionId] = useState<number | null>(null);
+  const [urlReady, setUrlReady] = useState(false);
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState<Site | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ region_id: '', name: '', code: '', description: '' });
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    setScopedRegionId(readRegionIdFromUrl());
+    setUrlReady(true);
+  }, []);
+
+  const scopedRegion = useMemo(
+    () => regions.find(r => r.id === scopedRegionId) || null,
+    [regions, scopedRegionId],
+  );
+
+  const visibleSites = useMemo(
+    () => scopedRegionId == null ? sites : sites.filter(s => s.region_id === scopedRegionId),
+    [sites, scopedRegionId],
+  );
 
   const load = async () => {
     setLoading(true);
@@ -46,16 +71,25 @@ export default function SitesPage() {
     const params = new URLSearchParams(window.location.search);
     if (params.get('new') !== '1') return;
 
+    const regionId = scopedRegionId ?? regions[0].id;
     setEditing(null);
-    setForm({ region_id: regions[0].id.toString(), name: '', code: '', description: '' });
+    setForm({ region_id: regionId.toString(), name: '', code: '', description: '' });
     setShowForm(true);
     setError('');
-    window.history.replaceState(null, '', window.location.pathname);
-  }, [regions]);
+    const next = scopedRegionId
+      ? `${window.location.pathname}?region_id=${scopedRegionId}`
+      : window.location.pathname;
+    window.history.replaceState(null, '', next);
+  }, [regions, scopedRegionId]);
 
   const openNew = () => {
     setEditing(null);
-    setForm({ region_id: regions[0]?.id?.toString() || '', name: '', code: '', description: '' });
+    setForm({
+      region_id: (scopedRegionId ?? regions[0]?.id)?.toString() || '',
+      name: '',
+      code: '',
+      description: '',
+    });
     setShowForm(true);
     setError('');
   };
@@ -103,12 +137,19 @@ export default function SitesPage() {
     else alert(json.message || '刪除失敗');
   };
 
+  const regionOptions = scopedRegion ? [scopedRegion] : regions;
+  const pageTitle = scopedRegion ? `${getRegionLabel(scopedRegion)}｜廠區管理` : '廠區管理';
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">廠區管理</h1>
-          <p className="text-sm text-gray-500 mt-1">區域下的實際廠區。代號用於分類素材，建立後無法修改。</p>
+          <h1 className="text-2xl font-bold text-gray-900">{pageTitle}</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            {scopedRegion
+              ? '只顯示此區域的廠區。代號用於分類素材，建立後無法修改。'
+              : '區域下的實際廠區。代號用於分類素材，建立後無法修改。'}
+          </p>
         </div>
         <button
           onClick={openNew}
@@ -131,9 +172,16 @@ export default function SitesPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">所屬區域 *</label>
-              <select required value={form.region_id} onChange={e => setForm({ ...form, region_id: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500">
-                {regions.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+              <select
+                required
+                value={form.region_id}
+                disabled={!!scopedRegion}
+                onChange={e => setForm({ ...form, region_id: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500 disabled:bg-gray-100"
+              >
+                {regionOptions.map(r => (
+                  <option key={r.id} value={r.id}>{getRegionLabel(r)}</option>
+                ))}
               </select>
             </div>
             <div>
@@ -176,7 +224,7 @@ export default function SitesPage() {
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
               <th className="px-4 py-3 text-left font-medium text-gray-700">ID</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-700">區域</th>
+              {!scopedRegion && <th className="px-4 py-3 text-left font-medium text-gray-700">區域</th>}
               <th className="px-4 py-3 text-left font-medium text-gray-700">名稱</th>
               <th className="px-4 py-3 text-left font-medium text-gray-700">代號</th>
               <th className="px-4 py-3 text-left font-medium text-gray-700">說明</th>
@@ -184,14 +232,14 @@ export default function SitesPage() {
             </tr>
           </thead>
           <tbody>
-            {loading ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">載入中...</td></tr>
-            ) : sites.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">尚無資料</td></tr>
-            ) : sites.map(s => (
+            {loading || !urlReady ? (
+              <tr><td colSpan={scopedRegion ? 5 : 6} className="px-4 py-8 text-center text-gray-400">載入中...</td></tr>
+            ) : visibleSites.length === 0 ? (
+              <tr><td colSpan={scopedRegion ? 5 : 6} className="px-4 py-8 text-center text-gray-400">尚無資料</td></tr>
+            ) : visibleSites.map(s => (
               <tr key={s.id} className="border-b border-gray-100 hover:bg-gray-50">
                 <td className="px-4 py-3 text-gray-500">{s.id}</td>
-                <td className="px-4 py-3">{s.region_name}</td>
+                {!scopedRegion && <td className="px-4 py-3">{s.region_name}</td>}
                 <td className="px-4 py-3 font-medium">{s.name}</td>
                 <td className="px-4 py-3 font-mono text-cyan-600">{s.code}</td>
                 <td className="px-4 py-3 text-gray-600">{s.description || '—'}</td>

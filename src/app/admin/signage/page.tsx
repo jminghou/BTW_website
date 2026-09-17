@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { getRegionLabel } from '@/lib/signage/regionLabel';
 
 interface Region {
   id: number;
@@ -20,15 +21,6 @@ interface Site {
 
 type Density = 'compact' | 'comfortable';
 type SortOption = 'name' | 'code';
-
-const REGION_LABELS: Record<string, string> = {
-  HS: '新竹地區',
-  TP: '台北地區',
-};
-
-function getRegionLabel(region: Region) {
-  return REGION_LABELS[region.name.toUpperCase()] ?? region.name;
-}
 
 function SearchIcon() {
   return (
@@ -293,9 +285,14 @@ export default function SignageOverviewPage() {
                     <p className="mt-0.5 truncate text-xs text-slate-400">{region.description}</p>
                   )}
                 </div>
-                <Link href="/admin/signage/regions" className="whitespace-nowrap text-xs font-semibold text-slate-500 hover:text-cyan-700">
-                  區域設定
-                </Link>
+                <div className="flex items-center gap-3">
+                  <Link href={`/admin/signage/sites?region_id=${region.id}`} className="whitespace-nowrap text-xs font-semibold text-slate-500 hover:text-cyan-700">
+                    廠區管理
+                  </Link>
+                  <Link href="/admin/signage/regions" className="whitespace-nowrap text-xs font-semibold text-slate-500 hover:text-cyan-700">
+                    區域設定
+                  </Link>
+                </div>
               </div>
 
               <div className="hidden grid-cols-12 gap-3 border-y border-slate-100 bg-white px-5 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400 sm:grid">
