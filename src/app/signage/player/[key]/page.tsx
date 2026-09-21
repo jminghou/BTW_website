@@ -23,10 +23,11 @@ interface PlayerResponse {
   current_time?: string;
 }
 
-const POLL_INTERVAL_MS = 15_000; // 每 15 秒輪詢一次；命中 Data Cache 不打 DB，畫面最慢約 15 秒更新
-const FADE_DURATION_MS = 1500;
-const READY_SETTLE_MS = 150; // iframe onLoad 後稍等首屏穩定再淡入，降低閃爍感
-const READY_FALLBACK_MS = 1600; // 若素材未送 ready 訊號，超時後仍執行切換
+const POLL_INTERVAL_MS = 15_000;
+const FADE_DURATION_MS = 800;
+const READY_SETTLE_MS = 80;
+const HTML_READY_FALLBACK_MS = 1600;
+const IMAGE_READY_FALLBACK_MS = 400;
 
 type SlotName = 'a' | 'b';
 type FrameSlot = {
@@ -36,6 +37,35 @@ type FrameSlot = {
 function isImageItem(item: PlayerItem | null | undefined): boolean {
   if (!item) return false;
   return item.kind === 'image' || isImageFilename(item.filename);
+}
+
+function PlayerMedia({
+  item,
+  opacityClass,
+  onReady,
+}: {
+  item: PlayerItem;
+  opacityClass: string;
+  onReady?: () => void;
+}) {
+  const readyRef = useRef(onReady);
+  readyRef.current = onReady;
+  const common = `absolute inset-0 h-full w-full border-0 bg-black transition-opacity duration-[800ms] ${opacityClass}`;
+
+  if (isImageItem(item)) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={item.url}
+        alt={item.filename}
+        className={`${common} object-contain`}
+        onLoad={() => readyRef.current?.()}
+        onError={() => readyRef.current?.()}
+      />
+    );
+  }
+
+  return <iframe src={item.url} className={common} title={item.filename} />;
 }
 
 export default function PlayerPage() {
@@ -56,9 +86,13 @@ export default function PlayerPage() {
   const fadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const readyFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const transitionStartedRef = useRef(false);
+  const pendingSlotRef = useRef<SlotName | null>(null);
   const items = data?.items ?? [];
 
-  // ------- 取得排程（含初次與定期重新整理） -------
+  useEffect(() => {
+    pendingSlotRef.current = pendingSlot;
+  }, [pendingSlot]);
+
   const fetchSchedule = useCallback(async () => {
     if (!key) return;
     try {
@@ -66,7 +100,6 @@ export default function PlayerPage() {
       const json: PlayerResponse = await res.json();
       setData(json);
 
-      // 清單網址或秒數有變就重置，避免改秒數後仍卡在上一輪的長計時
       const sig = JSON.stringify((json.items ?? []).map(i => `${i.url}:${i.duration}`));
       if (sig !== playlistSignatureRef.current) {
         playlistSignatureRef.current = sig;
@@ -74,8 +107,6 @@ export default function PlayerPage() {
       }
     } catch (err) {
       console.error('取得排程失敗：', err);
-      // 斷網容錯：若已有正在播放的清單，保留現有內容繼續播（靠 Service Worker 快取），
-      // 不要因為一次輪詢失敗就跳待機/錯誤畫面。下次輪詢成功會自動恢復。
       setData(prev =>
         prev && prev.status === 'playing' && (prev.items?.length ?? 0) > 0
           ? prev
@@ -90,7 +121,6 @@ export default function PlayerPage() {
     return () => clearInterval(timer);
   }, [fetchSchedule]);
 
-  // ------- 註冊 Service Worker（Layer 2）：支援的裝置才啟用，離線續播 + 永久快取 -------
   useEffect(() => {
     if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
     navigator.serviceWorker.register('/signage-sw.js').catch(err => {
@@ -98,13 +128,10 @@ export default function PlayerPage() {
     });
   }, []);
 
-  // ------- 清單變動時通知 SW 預抓整份清單、清掉舊版本素材 -------
   useEffect(() => {
     if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
     const urls = (data?.items ?? []).map(i => i.url);
     const sig = urls.join('|');
-    // 每次輪詢回應都含變動的 current_time，故 data 物件每分鐘都換新；
-    // 這裡以「素材網址集合」為準，只有真的換清單/換版本才通知 SW，避免每分鐘重抓。
     if (sig === swSyncSigRef.current) return;
     swSyncSigRef.current = sig;
     if (urls.length === 0) return;
@@ -117,20 +144,21 @@ export default function PlayerPage() {
   }, [data]);
 
   const rotationKey = items.map(i => `${i.url}:${i.duration}`).join('|');
+  const current = items[currentIdx];
+  const visible = !pendingSlot && !isFading;
 
-  // ------- 輪播切換邏輯 -------
+  // 畫面穩定顯示後才開始算停留秒數，避免淡入淡出比停留時間還長而卡住
   useEffect(() => {
-    if (items.length === 0) return;
+    if (items.length <= 1) return;
+    if (!visible) return;
 
     const duration = Math.max(1, items[currentIdx]?.duration ?? 10) * 1000;
     const timer = setTimeout(() => {
       setCurrentIdx(i => (i + 1) % items.length);
     }, duration);
     return () => clearTimeout(timer);
-  }, [currentIdx, rotationKey]);
+  }, [currentIdx, rotationKey, visible]);
 
-  // ------- 雙緩衝轉場：預載入新素材後再淡入淡出 -------
-  const current = items[currentIdx];
   useEffect(() => {
     if (!current) {
       setSlotA({ item: null });
@@ -153,23 +181,23 @@ export default function PlayerPage() {
 
     const nextPending: SlotName = activeSlot === 'a' ? 'b' : 'a';
     const pendingFrame = nextPending === 'a' ? slotA : slotB;
-    if (pendingFrame.item?.url === current.url) return;
+    if (pendingFrame.item?.url === current.url && pendingSlot === nextPending) return;
 
     if (nextPending === 'a') setSlotA({ item: current });
     else setSlotB({ item: current });
     setPendingSlot(nextPending);
     setIsFading(false);
     transitionStartedRef.current = false;
-  }, [activeSlot, current, slotA, slotB]);
+  }, [activeSlot, current, slotA, slotB, pendingSlot]);
 
   const startTransition = useCallback(() => {
-    if (!pendingSlot) return;
-    const pendingFrame = pendingSlot === 'a' ? slotA : slotB;
+    if (!pendingSlotRef.current) return;
+    const nextSlot = pendingSlotRef.current;
+    const pendingFrame = nextSlot === 'a' ? slotA : slotB;
     if (!pendingFrame.item) return;
     if (transitionStartedRef.current) return;
     transitionStartedRef.current = true;
 
-    const nextSlot = pendingSlot;
     if (readyFallbackTimerRef.current) clearTimeout(readyFallbackTimerRef.current);
     if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
     if (fadeTimerRef.current) clearTimeout(fadeTimerRef.current);
@@ -183,34 +211,37 @@ export default function PlayerPage() {
         transitionStartedRef.current = false;
       }, FADE_DURATION_MS);
     }, READY_SETTLE_MS);
-  }, [pendingSlot, slotA, slotB]);
+  }, [slotA, slotB]);
 
   useEffect(() => {
     if (!pendingSlot) return;
     const pendingFrame = pendingSlot === 'a' ? slotA : slotB;
     if (!pendingFrame.item) return;
-    if (readyFallbackTimerRef.current) clearTimeout(readyFallbackTimerRef.current);
 
+    const wait = isImageItem(pendingFrame.item) ? IMAGE_READY_FALLBACK_MS : HTML_READY_FALLBACK_MS;
+    if (readyFallbackTimerRef.current) clearTimeout(readyFallbackTimerRef.current);
     readyFallbackTimerRef.current = setTimeout(() => {
       startTransition();
-    }, READY_FALLBACK_MS);
+    }, wait);
+
+    return () => {
+      if (readyFallbackTimerRef.current) clearTimeout(readyFallbackTimerRef.current);
+    };
   }, [pendingSlot, slotA, slotB, startTransition]);
 
   useEffect(() => {
     const onMessage = (e: MessageEvent) => {
       const payload = e.data as { type?: string; href?: string };
       if (!payload || payload.type !== 'signage-ready') return;
-      if (!pendingSlot) return;
-      const pendingFrame = pendingSlot === 'a' ? slotA : slotB;
+      if (!pendingSlotRef.current) return;
+      const pendingFrame = pendingSlotRef.current === 'a' ? slotA : slotB;
       if (!pendingFrame.item) return;
-      // 素材頁面回報自身網址；與 pending 素材網址相符才觸發轉場，
-      // 避免舊 frame 的延遲訊息誤觸。缺 href 時仍相容觸發。
       if (payload.href && payload.href !== pendingFrame.item.url) return;
       startTransition();
     };
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
-  }, [pendingSlot, slotA, slotB, startTransition]);
+  }, [slotA, slotB, startTransition]);
 
   useEffect(() => {
     return () => {
@@ -220,15 +251,12 @@ export default function PlayerPage() {
     };
   }, []);
 
-  // ------- 快捷鍵：Ctrl+S 切換狀態顯示、Ctrl+R 手動重整 -------
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.key === 's') {
         e.preventDefault();
         setShowStatus(v => !v);
       } else if (e.ctrlKey && e.altKey && (e.key === 'r' || e.key === 'R')) {
-        // 緊急復原：解除 Service Worker 註冊並清空快取後重載（退回 Layer 1）
-        // 用 Ctrl+Alt+R 避免與瀏覽器 Ctrl+Shift+R 硬重載搶事件
         e.preventDefault();
         (async () => {
           try {
@@ -255,7 +283,6 @@ export default function PlayerPage() {
     return () => window.removeEventListener('keydown', onKey);
   }, [fetchSchedule]);
 
-  // ------- 待機/錯誤畫面 -------
   const isIdle = !data || data.status !== 'playing' || items.length === 0;
 
   if (isIdle) {
@@ -273,9 +300,6 @@ export default function PlayerPage() {
 
   const activeFrame = activeSlot === 'a' ? slotA : slotB;
   const active = activeFrame.item;
-  const transitionDurationClass = `duration-[${FADE_DURATION_MS}ms]`;
-  const slotASrc = slotA.item ? slotA.item.url : '';
-  const slotBSrc = slotB.item ? slotB.item.url : '';
   const slotAOpacity = activeSlot === 'a'
     ? (isFading && pendingSlot === 'b' ? 'opacity-0' : 'opacity-100')
     : (pendingSlot === 'a' ? (isFading ? 'opacity-100' : 'opacity-0') : 'opacity-0');
@@ -284,43 +308,21 @@ export default function PlayerPage() {
     : (pendingSlot === 'b' ? (isFading ? 'opacity-100' : 'opacity-0') : 'opacity-0');
 
   return (
-    <div className="fixed inset-0 w-screen h-screen bg-black">
+    <div className="fixed inset-0 w-screen h-screen overflow-hidden bg-black">
       {slotA.item && (
-        isImageItem(slotA.item) ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={slotASrc}
-            alt={slotA.item.filename}
-            className={`absolute inset-0 w-full h-full object-contain bg-black transition-opacity ${transitionDurationClass} ${slotAOpacity}`}
-            onLoad={() => { if (pendingSlot === 'a') startTransition(); }}
-            onError={() => { if (pendingSlot === 'a') startTransition(); }}
-          />
-        ) : (
-          <iframe
-            src={slotASrc}
-            className={`absolute inset-0 w-full h-full border-0 transition-opacity ${transitionDurationClass} ${slotAOpacity}`}
-            title={slotA.item.filename}
-          />
-        )
+        <PlayerMedia
+          item={slotA.item}
+          opacityClass={slotAOpacity}
+          onReady={pendingSlot === 'a' ? startTransition : undefined}
+        />
       )}
 
       {slotB.item && (
-        isImageItem(slotB.item) ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={slotBSrc}
-            alt={slotB.item.filename}
-            className={`absolute inset-0 w-full h-full object-contain bg-black transition-opacity ${transitionDurationClass} ${slotBOpacity}`}
-            onLoad={() => { if (pendingSlot === 'b') startTransition(); }}
-            onError={() => { if (pendingSlot === 'b') startTransition(); }}
-          />
-        ) : (
-          <iframe
-            src={slotBSrc}
-            className={`absolute inset-0 w-full h-full border-0 transition-opacity ${transitionDurationClass} ${slotBOpacity}`}
-            title={slotB.item.filename}
-          />
-        )
+        <PlayerMedia
+          item={slotB.item}
+          opacityClass={slotBOpacity}
+          onReady={pendingSlot === 'b' ? startTransition : undefined}
+        />
       )}
 
       {showStatus && (
