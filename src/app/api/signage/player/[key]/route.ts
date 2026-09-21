@@ -7,20 +7,15 @@ import {
 import { matchSchedules, type ScheduleRow } from '@/lib/signage/schedule';
 import { assetProxyUrl } from '@/lib/signage/assetVersion';
 import { signageMediaKind } from '@/lib/signage/mediaType';
-import { cachedSignageRead, revalidateSignage } from '@/lib/signage/cache';
+import { createSignageCached, revalidateSignage } from '@/lib/signage/cache';
 
 /**
  * 這支路由必須每次請求都真的執行（排程比對相依於「現在幾點」，不能整包快取回應）。
- * 但「執行」不等於「查 DB」：下方三筆讀取都走 cachedSignageRead，
- * 平常命中 Data Cache 完全不碰資料庫，後台一寫入就自動失效。
+ * 但「執行」不等於「查 DB」：下方三筆讀取都走 Data Cache，
+ * 平常命中完全不碰資料庫，後台一寫入就自動失效。
  *
- * 歷史說明：
- *   這裡原本用 force-dynamic 關掉框架快取，是為了修「播放清單改了但播放器
- *   讀到舊快照」的 bug——但那等於連同省錢的快取一起關掉，再靠 CDN 的
- *   s-maxage=180 補救。結果是每 3 分鐘一定回源查一次 DB，而 Neon 要閒置
- *   滿 5 分鐘才休眠 → 只要有螢幕開著 compute 就永遠醒著（帳單來源）。
- *   正解是「快取 + 寫入時 tag 失效」，既不會讀到舊資料、又不用一直查 DB，
- *   而且排程改動比原本的 3 分鐘更快生效。
+ * 快取必須在模組層建立，並把螢幕 key / playlist id 當函式引數傳入；
+ * 否則正式環境 minify 後不同螢幕會撞成同一格，A 電腦播櫃台、B 電腦播到用餐區。
  */
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -28,24 +23,7 @@ export const revalidate = 0;
 interface ScreenRow {
   id: number;
   name: string;
-}
-
-/** 螢幕基本資料：查無此螢幕是穩定結果可快取，連線失敗則丟出錯誤不快取 */
-function loadScreen(key: string) {
-  return cachedSignageRead(['screen', key], async () => {
-    const result = await getScreenByKey(key);
-    if (result.success && result.data) return result.data as unknown as ScreenRow;
-    if (result.error === '找不到指定的螢幕') return null;
-    throw new Error('讀取螢幕資料失敗');
-  });
-}
-
-function loadSchedules(key: string) {
-  return cachedSignageRead(['schedules', key], async () => {
-    const result = await getSchedulesByScreenKey(key);
-    if (!result.success) throw new Error('取得排程失敗');
-    return (result.data as unknown as ScheduleRow[]) ?? [];
-  });
+  unique_key: string;
 }
 
 interface RawPlaylistItem {
@@ -56,13 +34,24 @@ interface RawPlaylistItem {
   description: string | null;
 }
 
-function loadPlaylistItems(playlistId: number) {
-  return cachedSignageRead(['playlist-items', String(playlistId)], async () => {
-    const result = await getPlaylistItemsByPlaylistId(playlistId);
-    if (!result.success) throw new Error('取得播放清單項目失敗');
-    return (result.data as unknown as RawPlaylistItem[]) ?? [];
-  });
-}
+const loadScreen = createSignageCached('screen', async (key: string) => {
+  const result = await getScreenByKey(key);
+  if (result.success && result.data) return result.data as unknown as ScreenRow;
+  if (result.error === '找不到指定的螢幕') return null;
+  throw new Error('讀取螢幕資料失敗');
+});
+
+const loadSchedules = createSignageCached('schedules', async (key: string) => {
+  const result = await getSchedulesByScreenKey(key);
+  if (!result.success) throw new Error('取得排程失敗');
+  return (result.data as unknown as ScheduleRow[]) ?? [];
+});
+
+const loadPlaylistItems = createSignageCached('playlist-items', async (playlistId: string) => {
+  const result = await getPlaylistItemsByPlaylistId(Number(playlistId));
+  if (!result.success) throw new Error('取得播放清單項目失敗');
+  return (result.data as unknown as RawPlaylistItem[]) ?? [];
+});
 
 /**
  * 刻意不做 CDN 快取。
@@ -70,9 +59,13 @@ function loadPlaylistItems(playlistId: number) {
  * 省 DB 的工作已經由 Data Cache 接手（輪詢命中時 0 次查詢），
  * 這裡再加 s-maxage 只會有壞處：手動設定的 Cache-Control 會在 CDN 產生
  * 一個 revalidateTag purge 不到的快取條目，讓後台改好的排程被卡住到期為止。
- * 拿掉之後，排程改動在下一次輪詢（最慢 60 秒）就會上螢幕。
  */
-const NO_STORE = { 'Cache-Control': 'no-store' } as const;
+const NO_STORE = {
+  'Cache-Control': 'private, no-store, no-cache, must-revalidate',
+  Pragma: 'no-cache',
+  'CDN-Cache-Control': 'no-store',
+  'Vercel-CDN-Cache-Control': 'no-store',
+} as const;
 
 /**
  * 播放器核心 API
@@ -95,8 +88,7 @@ export async function GET(
   }
 
   try {
-    // 1. 找螢幕（與排程互不相依，同時發出）
-    const [screen, schedules] = await Promise.all([
+    let [screen, schedules] = await Promise.all([
       loadScreen(key),
       loadSchedules(key),
     ]);
@@ -104,27 +96,43 @@ export async function GET(
       return NextResponse.json({
         status: 'error',
         message: '找不到對應的螢幕',
-      }, { status: 404 });
+      }, { status: 404, headers: NO_STORE });
     }
 
-    // 2. 匹配當前時段所有排程（撞期時合併輪播；相依於「現在幾點」，每次都要重算）
+    // Data Cache 若把別台螢幕寫進同一格，這裡打回 DB，避免櫃台播到用餐區清單。
+    if (screen.unique_key && screen.unique_key !== key) {
+      revalidateSignage();
+      const freshScreen = await getScreenByKey(key);
+      if (!freshScreen.success || !freshScreen.data) {
+        return NextResponse.json({
+          status: 'error',
+          message: '找不到對應的螢幕',
+        }, { status: 404, headers: NO_STORE });
+      }
+      screen = freshScreen.data as unknown as ScreenRow;
+    }
+    if (schedules.some(s => s.screen_id !== screen.id)) {
+      const fresh = await getSchedulesByScreenKey(key);
+      if (!fresh.success) throw new Error('取得排程失敗');
+      schedules = (fresh.data as unknown as ScheduleRow[]) ?? [];
+      revalidateSignage();
+    }
+    schedules = schedules.filter(s => s.screen_id === screen.id);
+
     const matched = matchSchedules(schedules);
     if (matched.length === 0) {
       return NextResponse.json({
         status: 'idle',
         message: '目前無排程',
         items: [],
+        screen_key: key,
         screen_name: screen.name,
         current_time: new Date().toISOString(),
       }, { headers: NO_STORE });
     }
 
-    // 3. 依優先序取出各清單項目，接成一輪
     const itemLists = await Promise.all(matched.map(async (schedule) => {
-      let rawItems = await loadPlaylistItems(schedule.playlist_id);
-      // 播放端快取不會自動到期。若清單曾以「空陣列」被快住（例如素材是之後才加進去、
-      // 或寫入發生在別的部署而沒打到這台的 tag 失效），這裡補一次直讀 DB。
-      // 只有真的讀到內容才整組失效，避免「本來就沒素材」的排程每分鐘打爆快取。
+      let rawItems = await loadPlaylistItems(String(schedule.playlist_id));
       if (rawItems.length === 0) {
         const fresh = await getPlaylistItemsByPlaylistId(schedule.playlist_id);
         if (fresh.success && Array.isArray(fresh.data) && fresh.data.length > 0) {
@@ -136,10 +144,6 @@ export async function GET(
     }));
     const rawItems = itemLists.flat();
 
-    // 透過 proxy 路由提供 .html，避免 Vercel Blob 的 attachment disposition
-    // 讓 iframe 能正常嵌入渲染（而非觸發下載）。
-    // 網址帶 ?v={blob 版本碼}：素材一經編輯版本碼就變，iframe 會重載、CDN 也會 miss
-    // → 前台立即看到新內容（最慢只差一個排程輪詢週期）。
     const items = rawItems.map(it => ({
       url: assetProxyUrl(it.asset_id, it.blob_url),
       duration: it.duration_seconds,
@@ -154,6 +158,7 @@ export async function GET(
       playlist_id: matched[0].playlist_id,
       schedule_id: matched[0].id,
       items,
+      screen_key: key,
       screen_name: screen.name,
       current_time: new Date().toISOString(),
     }, { headers: NO_STORE });
@@ -162,6 +167,6 @@ export async function GET(
     return NextResponse.json({
       status: 'error',
       message: '伺服器內部錯誤',
-    }, { status: 500 });
+    }, { status: 500, headers: NO_STORE });
   }
 }

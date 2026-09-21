@@ -72,6 +72,15 @@ function normalizeScheduleDates(schedule: Schedule): Schedule {
 function isoWeekday(d: Date): number {
   return ((d.getDay() + 6) % 7) + 1;
 }
+
+/** 一鍵轉排程預設只勾符合該模式的清單，避免把週菜單／宣傳頁勾進櫃台。 */
+function playlistFitsAutoMode(name: string, mode: 'daily' | 'weekly'): boolean {
+  const range = /\d{4}-\d{2}-\d{2}_\d{4}-\d{2}-\d{2}/.test(name);
+  if (mode === 'weekly') return range;
+  if (range) return false;
+  return /(?:^|_)[BLDN]_\d{4}-\d{2}-\d{2}(?:$|[_\-.])/i.test(name)
+    || /(?:早餐|午餐|晚餐|宵夜|早|午|晚|宵)_\d{4}-\d{2}-\d{2}/.test(name);
+}
 /** 依開始時間推餐期標籤與顏色 */
 function slotStyle(startTime: string): { label: string; cls: string } {
   const h = parseInt(startTime.substring(0, 2), 10);
@@ -242,7 +251,9 @@ export default function SiteSchedulesPage() {
   const openAutoGenerate = (mode: 'daily' | 'weekly') => {
     setAutoMode(mode);
     setPlaylistFilter('');
-    setPickedPlaylistIds(new Set(playlists.map(p => p.id)));
+    setPickedPlaylistIds(new Set(
+      playlists.filter(p => playlistFitsAutoMode(p.name, mode)).map(p => p.id),
+    ));
   };
 
   const togglePickedPlaylist = (id: number) => {
@@ -745,9 +756,9 @@ export default function SiteSchedulesPage() {
             </p>
             <p className="text-xs text-gray-400">
               {autoMode === 'weekly'
-                ? '依檔名區間判斷，例如 F3_L_2026-09-14_2026-09-18。'
-                : '依檔名日期判斷，例如 F3_L_2026-09-14。'}
-              可再用名稱篩選，只轉這台螢幕要播的清單。
+                ? '預設只勾區間檔名，例如 F3_L_2026-09-14_2026-09-18。'
+                : '預設只勾單日檔名，例如 F3_L_2026-09-14。'}
+              「本週菲律賓餐」這類宣傳清單不會自動勾選，避免進到櫃台輪播。
             </p>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">清單名稱篩選</label>

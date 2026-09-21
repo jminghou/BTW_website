@@ -1288,19 +1288,24 @@ function mealKeyFromZh(label: string): MealKey {
         : 'N';
 }
 
+/** 區間檔名（F3_L_2026-09-21_2026-09-25.html）不該被日排程當成單日菜單。 */
+function isDateRangeName(text: string): boolean {
+  return /\d{4}-\d{2}-\d{2}_\d{4}-\d{2}-\d{2}/.test(text);
+}
+
 /**
  * 從檔名或清單名解析餐期與「單日」日期（一鍵轉日排程）。
  * 支援：
  *  - F3_L_2026-06-24.html
  *  - F3_L_2026-06-24_TV.html
  *  - F3_午餐_2026-06-24.html
- * 區間檔名（F3_L_2026-09-14_2026-09-18.html）只會取第一個日期，維持既有行為。
+ * 區間檔名請走 weekly 模式，日排程會略過。
  */
 function parseMealAndDate(raw: string): { mealKey: MealKey; date: string } | null {
   const text = String(raw || '').trim();
-  if (!text) return null;
+  if (!text || isDateRangeName(text)) return null;
 
-  // 先處理最常見格式：_B/L/D/N_YYYY-MM-DD（後方允許有尾碼）
+  // 先處理最常見格式：_B/L/D/N_YYYY-MM-DD（後方允許有尾碼，例如 _TV）
   const alpha = text.match(/(?:^|_)([BLDN])_(\d{4}-\d{2}-\d{2})(?:$|[_\-.])/i);
   if (alpha) {
     return { mealKey: alpha[1].toUpperCase() as MealKey, date: alpha[2] };

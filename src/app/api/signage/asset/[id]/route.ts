@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAssetById } from '@/lib/signage/db';
-import { cachedSignageRead } from '@/lib/signage/cache';
+import { createSignageCached } from '@/lib/signage/cache';
 import { contentTypeForFilename, isImageFilename, sniffImageContentType } from '@/lib/signage/mediaType';
 
 /**
@@ -8,17 +8,15 @@ import { contentTypeForFilename, isImageFilename, sniffImageContentType } from '
  * 這支路由在播放熱路徑上（每個 iframe 載入都會打），原本每次都查一次 DB。
  * 回傳 null 代表確實查無此素材（穩定結果可快取）；連線失敗則丟出錯誤不快取。
  */
-function loadAssetMeta(id: number) {
-  return cachedSignageRead(['asset-meta', String(id)], async () => {
-    const result = await getAssetById(id);
-    if (result.success && result.data) {
-      const row = result.data as unknown as { blob_url: string; filename: string };
-      return { blob_url: row.blob_url, filename: row.filename };
-    }
-    if (result.error === '找不到指定的素材') return null;
-    throw new Error('讀取素材失敗');
-  });
-}
+const loadAssetMeta = createSignageCached('asset-meta', async (id: string) => {
+  const result = await getAssetById(Number(id));
+  if (result.success && result.data) {
+    const row = result.data as unknown as { blob_url: string; filename: string };
+    return { blob_url: row.blob_url, filename: row.filename };
+  }
+  if (result.error === '找不到指定的素材') return null;
+  throw new Error('讀取素材失敗');
+});
 
 function injectReadyHandshakeScript(html: string): string {
   const prelude = `
@@ -154,7 +152,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const hasVersion = req.nextUrl.searchParams.has('v');
 
   try {
-    const asset = await loadAssetMeta(id);
+    const asset = await loadAssetMeta(String(id));
     if (!asset) {
       return new NextResponse('Asset not found', { status: 404 });
     }

@@ -15,7 +15,7 @@
  * 不支援 Service Worker 的裝置由播放端 feature-detect 略過註冊，自動退回 Layer 1。
  */
 
-const CACHE = 'signage-cache-v4';
+const CACHE = 'signage-cache-v5';
 
 self.addEventListener('install', () => {
   self.skipWaiting();
@@ -61,17 +61,18 @@ async function precache(urls) {
   }));
 }
 
-/** 清掉素材快取中「不在目前清單」的舊版本（素材編輯後 ?v= 改變，舊版本會被留下） */
+/** 只清「同一支素材的舊 ?v= 版本」。不可刪其他螢幕正在播的素材，SW 是整個網域共用的。 */
 async function purgeOldAssets(keepUrls) {
   const cache = await caches.open(CACHE);
-  const keep = new Set(keepUrls.map(normalizePath).filter(Boolean));
+  const keepExact = new Set(keepUrls.map(normalizePath).filter(Boolean));
+  const keepPaths = new Set(Array.from(keepExact).map((p) => p.split('?')[0]));
   const requests = await cache.keys();
   await Promise.all(requests.map(async (req) => {
     const url = new URL(req.url);
-    if (url.pathname.startsWith('/api/signage/asset/')) {
-      if (!keep.has(url.pathname + url.search)) {
-        await cache.delete(req);
-      }
+    if (!url.pathname.startsWith('/api/signage/asset/')) return;
+    const key = url.pathname + url.search;
+    if (keepPaths.has(url.pathname) && !keepExact.has(key)) {
+      await cache.delete(req);
     }
   }));
 }
@@ -97,12 +98,14 @@ self.addEventListener('fetch', (event) => {
   }
   const sameOrigin = url.origin === self.location.origin;
 
-  // 排程 JSON 與播放頁面導覽：network-first（線上最新、離線續命）
-  if (
-    sameOrigin &&
-    (url.pathname.startsWith('/api/signage/player/') ||
-      (req.mode === 'navigate' && url.pathname.startsWith('/signage/player/')))
-  ) {
+  // 排程 JSON：只走網路，絕不拿別台螢幕快取下來的 JSON 頂替
+  if (sameOrigin && url.pathname.startsWith('/api/signage/player/')) {
+    event.respondWith(networkOnly(req));
+    return;
+  }
+
+  // 播放頁面導覽：network-first（線上最新、離線續命）
+  if (sameOrigin && req.mode === 'navigate' && url.pathname.startsWith('/signage/player/')) {
     event.respondWith(networkFirst(req));
     return;
   }

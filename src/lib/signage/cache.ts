@@ -33,6 +33,26 @@ export const SIGNAGE_TAG = 'signage';
  */
 export const SIGNAGE_SOLDOUT_TAG = 'signage-soldout';
 
+type CachedFn<Args extends unknown[], T> = (...args: Args) => Promise<T>;
+
+/**
+ * 在模組層建立 Data Cache。動態參數必須當函式引數傳入，
+ * Next 才會把它編進 cache key（cb.toString + keyParts + JSON.stringify(args)）。
+ *
+ * 舊寫法 `unstable_cache(async () => query(key), ['signage', key])()` 每次請求
+ * 都會 new 一個包著 closure 的 cache。正式環境 minify 後 cb.toString() 常撞在一起，
+ * 不同螢幕就會讀到同一格排程：A 電腦播櫃台菜單、B 電腦播到用餐區菲律賓餐。
+ */
+export function createSignageCached<Args extends unknown[], T>(
+  keyPrefix: string,
+  fn: CachedFn<Args, T>,
+): CachedFn<Args, T> {
+  return unstable_cache(fn, ['signage', keyPrefix], {
+    tags: [SIGNAGE_TAG],
+    revalidate: false,
+  });
+}
+
 /**
  * 包一層 Data Cache 的看版讀取。
  *
@@ -44,10 +64,14 @@ export function cachedSignageRead<T>(
   keyParts: string[],
   read: () => Promise<T>,
 ): Promise<T> {
-  return unstable_cache(read, ['signage', ...keyParts], {
-    tags: [SIGNAGE_TAG],
-    revalidate: false,
-  })();
+  const cacheKey = keyParts.join('|');
+  // 引數也編進 cache key，避免只靠 closure / minify 後的函式字串辨識
+  const cached = unstable_cache(
+    async (_k: string) => read(),
+    ['signage', ...keyParts],
+    { tags: [SIGNAGE_TAG], revalidate: false },
+  );
+  return cached(cacheKey);
 }
 
 /** 售完狀態讀取：平常輪詢打快取；現場點售完才失效再查 DB。 */
@@ -55,10 +79,12 @@ export function cachedSoldOutRead<T>(
   menuKey: string,
   read: () => Promise<T>,
 ): Promise<T> {
-  return unstable_cache(read, ['signage-soldout', menuKey], {
-    tags: [SIGNAGE_SOLDOUT_TAG, soldOutTagFor(menuKey)],
-    revalidate: false,
-  })();
+  const cached = unstable_cache(
+    async (_k: string) => read(),
+    ['signage-soldout', menuKey],
+    { tags: [SIGNAGE_SOLDOUT_TAG, soldOutTagFor(menuKey)], revalidate: false },
+  );
+  return cached(menuKey);
 }
 
 function soldOutTagFor(menuKey: string): string {

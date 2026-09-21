@@ -19,6 +19,7 @@ interface PlayerResponse {
   playlist_id?: number;
   schedule_id?: number;
   items: PlayerItem[];
+  screen_key?: string;
   screen_name?: string;
   current_time?: string;
 }
@@ -88,25 +89,56 @@ export default function PlayerPage() {
   const transitionStartedRef = useRef(false);
   const pendingSlotRef = useRef<SlotName | null>(null);
   const items = data?.items ?? [];
+  const keyRef = useRef(key);
+  keyRef.current = key;
 
   useEffect(() => {
     pendingSlotRef.current = pendingSlot;
   }, [pendingSlot]);
 
+  useEffect(() => {
+    setData(null);
+    setCurrentIdx(0);
+    setSlotA({ item: null });
+    setSlotB({ item: null });
+    setActiveSlot('a');
+    setPendingSlot(null);
+    setIsFading(false);
+    playlistSignatureRef.current = '';
+    swSyncSigRef.current = '';
+    transitionStartedRef.current = false;
+  }, [key]);
+
   const fetchSchedule = useCallback(async () => {
-    if (!key) return;
+    const requestKey = key;
+    if (!requestKey) return;
     try {
-      const res = await fetch(`/api/signage/player/${encodeURIComponent(key)}`, { cache: 'no-store' });
+      const res = await fetch(
+        `/api/signage/player/${encodeURIComponent(requestKey)}?t=${Date.now()}`,
+        { cache: 'no-store' },
+      );
       const json: PlayerResponse = await res.json();
+      if (keyRef.current !== requestKey) return;
+      if (json.screen_key && json.screen_key !== requestKey) {
+        console.error('播放器 API 回傳了別台螢幕的資料，已忽略', json.screen_key);
+        return;
+      }
       setData(json);
 
       const sig = JSON.stringify((json.items ?? []).map(i => `${i.url}:${i.duration}`));
       if (sig !== playlistSignatureRef.current) {
         playlistSignatureRef.current = sig;
         setCurrentIdx(0);
+        setSlotA({ item: null });
+        setSlotB({ item: null });
+        setActiveSlot('a');
+        setPendingSlot(null);
+        setIsFading(false);
+        transitionStartedRef.current = false;
       }
     } catch (err) {
       console.error('取得排程失敗：', err);
+      if (keyRef.current !== requestKey) return;
       setData(prev =>
         prev && prev.status === 'playing' && (prev.items?.length ?? 0) > 0
           ? prev
