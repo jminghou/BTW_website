@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAssetById } from '@/lib/signage/db';
 import { cachedSignageRead } from '@/lib/signage/cache';
-import { contentTypeForFilename, isImageFilename } from '@/lib/signage/mediaType';
+import { contentTypeForFilename, isImageFilename, sniffImageContentType } from '@/lib/signage/mediaType';
 
 /**
  * 素材的 blob 位址：走 Data Cache，寫入素材時自動失效。
@@ -172,18 +172,21 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       'X-Content-Type-Options': 'nosniff',
     } as const;
 
-    if (isImageFilename(asset.filename)) {
-      const body = await blobRes.arrayBuffer();
+    // 先讀成二進位再判斷：舊版曾把 PNG 當 HTML 做 text()，廣告機 SW 會把亂碼
+    // 以 immutable 快取一整年。用檔名或檔頭（magic bytes）辨識圖片後原樣輸出。
+    const body = await blobRes.arrayBuffer();
+    const sniffedType = sniffImageContentType(body);
+    if (isImageFilename(asset.filename) || sniffedType) {
       return new NextResponse(new Uint8Array(body), {
         status: 200,
         headers: {
-          'Content-Type': contentTypeForFilename(asset.filename),
+          'Content-Type': sniffedType || contentTypeForFilename(asset.filename),
           ...cacheHeaders,
         },
       });
     }
 
-    const html = await blobRes.text();
+    const html = new TextDecoder('utf-8').decode(body);
 
     // 把菜單 HTML 內指向共用資源的相對路徑改寫為絕對路徑
     //   ../../css/x.css  →  /signage-assets/css/x.css

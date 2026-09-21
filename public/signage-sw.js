@@ -15,7 +15,7 @@
  * 不支援 Service Worker 的裝置由播放端 feature-detect 略過註冊，自動退回 Layer 1。
  */
 
-const CACHE = 'signage-cache-v3';
+const CACHE = 'signage-cache-v4';
 
 self.addEventListener('install', () => {
   self.skipWaiting();

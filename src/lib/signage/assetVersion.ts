@@ -22,7 +22,7 @@ export function assetVersion(blobUrl: string | null | undefined): string {
  * 代理還會改寫腳本／注入售完同步，這層一變就必須換網址，
  * 否則 CDN、廣告機 Service Worker 會一直吐舊 HTML。
  */
-const ASSET_RUNTIME = '4';
+const ASSET_RUNTIME = '5';
 
 /** 產生帶版本碼的素材代理網址，供前台 iframe 與後台預覽使用 */
 export function assetProxyUrl(assetId: number, blobUrl: string | null | undefined): string {
