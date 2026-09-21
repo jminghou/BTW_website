@@ -115,7 +115,7 @@ export default function PlayerPage() {
     try {
       const res = await fetch(
         `/api/signage/player/${encodeURIComponent(requestKey)}?t=${Date.now()}`,
-        { cache: 'no-store' },
+        { cache: 'reload', headers: { Pragma: 'no-cache' } },
       );
       const json: PlayerResponse = await res.json();
       if (keyRef.current !== requestKey) return;
@@ -154,10 +154,29 @@ export default function PlayerPage() {
   }, [fetchSchedule]);
 
   useEffect(() => {
-    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
-    navigator.serviceWorker.register('/signage-sw.js').catch(err => {
-      console.warn('Service Worker 註冊失敗（退回 Layer 1 一般快取）：', err);
-    });
+    if (typeof window === 'undefined') return;
+    const BUST = 'sw-v6-isolate';
+    const run = async () => {
+      try {
+        if ('serviceWorker' in navigator) {
+          if (!sessionStorage.getItem(BUST)) {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(regs.map(r => r.unregister()));
+            if ('caches' in window) {
+              const names = await caches.keys();
+              await Promise.all(names.map(n => caches.delete(n)));
+            }
+            sessionStorage.setItem(BUST, '1');
+            window.location.reload();
+            return;
+          }
+          await navigator.serviceWorker.register('/signage-sw.js', { updateViaCache: 'none' });
+        }
+      } catch (err) {
+        console.warn('Service Worker 更新失敗：', err);
+      }
+    };
+    run();
   }, []);
 
   useEffect(() => {
@@ -357,6 +376,9 @@ export default function PlayerPage() {
         />
       )}
 
+      <div className="absolute bottom-2 right-2 bg-black/55 text-white text-[11px] px-2 py-1 rounded pointer-events-none max-w-[70vw] truncate">
+        {data?.screen_name} · {active?.filename ?? '載入中'} · {currentIdx + 1}/{items.length}
+      </div>
       {showStatus && (
         <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-3 py-2 rounded-lg space-y-1 max-w-xs">
           <div>螢幕：{data?.screen_name}</div>

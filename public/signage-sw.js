@@ -15,7 +15,7 @@
  * 不支援 Service Worker 的裝置由播放端 feature-detect 略過註冊，自動退回 Layer 1。
  */
 
-const CACHE = 'signage-cache-v5';
+const CACHE = 'signage-cache-v6';
 
 self.addEventListener('install', () => {
   self.skipWaiting();
@@ -27,7 +27,7 @@ self.addEventListener('activate', (event) => {
     const names = await caches.keys();
     await Promise.all(
       names
-        .filter((n) => n.startsWith('signage-cache-') && n !== CACHE)
+        .filter((n) => n.startsWith('signage-cache-'))
         .map((n) => caches.delete(n)),
     );
     await self.clients.claim();
@@ -97,6 +97,9 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   const sameOrigin = url.origin === self.location.origin;
+
+  // Next.js 打包檔必須走網路，避免舊 SW 把過期的播放器程式鎖住
+  if (sameOrigin && url.pathname.startsWith('/_next/')) return;
 
   // 排程 JSON：只走網路，絕不拿別台螢幕快取下來的 JSON 頂替
   if (sameOrigin && url.pathname.startsWith('/api/signage/player/')) {
