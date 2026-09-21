@@ -92,6 +92,9 @@ export default function PlayerPage() {
   const keyRef = useRef(key);
   keyRef.current = key;
 
+  const fetchGenRef = useRef(0);
+  const idleStreakRef = useRef(0);
+
   useEffect(() => {
     pendingSlotRef.current = pendingSlot;
   }, [pendingSlot]);
@@ -107,35 +110,48 @@ export default function PlayerPage() {
     playlistSignatureRef.current = '';
     swSyncSigRef.current = '';
     transitionStartedRef.current = false;
+    idleStreakRef.current = 0;
   }, [key]);
 
   const fetchSchedule = useCallback(async () => {
     const requestKey = key;
     if (!requestKey) return;
+    const gen = ++fetchGenRef.current;
     try {
       const res = await fetch(
         `/api/signage/player/${encodeURIComponent(requestKey)}?t=${Date.now()}`,
-        { cache: 'reload', headers: { Pragma: 'no-cache' } },
+        { cache: 'no-store' },
       );
       const json: PlayerResponse = await res.json();
+      if (gen !== fetchGenRef.current) return;
       if (keyRef.current !== requestKey) return;
       if (json.screen_key && json.screen_key !== requestKey) {
         console.error('播放器 API 回傳了別台螢幕的資料，已忽略', json.screen_key);
         return;
       }
-      if (json.status === 'playing' && (json.items ?? []).length === 0) {
-        return;
-      }
-      setData(json);
 
-      const sig = JSON.stringify((json.items ?? []).map(i => `${i.url}:${i.duration}`));
+      const nextItems = json.items ?? [];
+      const hasItems = json.status === 'playing' && nextItems.length > 0;
+      if (!hasItems) {
+        idleStreakRef.current += 1;
+        const hadPlaylist = playlistSignatureRef.current !== '' && playlistSignatureRef.current !== '[]';
+        if (hadPlaylist && idleStreakRef.current < 3) return;
+      } else {
+        idleStreakRef.current = 0;
+      }
+
+      setData(json);
+      const sig = JSON.stringify(nextItems.map(i => `${i.url}:${i.duration}`));
       if (sig !== playlistSignatureRef.current) {
         playlistSignatureRef.current = sig;
         setCurrentIdx(0);
       }
     } catch (err) {
       console.error('取得排程失敗：', err);
+      if (gen !== fetchGenRef.current) return;
       if (keyRef.current !== requestKey) return;
+      idleStreakRef.current += 1;
+      if (idleStreakRef.current < 3) return;
       setData(prev =>
         prev && prev.status === 'playing' && (prev.items?.length ?? 0) > 0
           ? prev
@@ -151,29 +167,10 @@ export default function PlayerPage() {
   }, [fetchSchedule]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const BUST = 'sw-v6-isolate';
-    const run = async () => {
-      try {
-        if ('serviceWorker' in navigator) {
-          if (!sessionStorage.getItem(BUST)) {
-            const regs = await navigator.serviceWorker.getRegistrations();
-            await Promise.all(regs.map(r => r.unregister()));
-            if ('caches' in window) {
-              const names = await caches.keys();
-              await Promise.all(names.map(n => caches.delete(n)));
-            }
-            sessionStorage.setItem(BUST, '1');
-            window.location.reload();
-            return;
-          }
-          await navigator.serviceWorker.register('/signage-sw.js', { updateViaCache: 'none' });
-        }
-      } catch (err) {
-        console.warn('Service Worker 更新失敗：', err);
-      }
-    };
-    run();
+    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
+    navigator.serviceWorker.register('/signage-sw.js', { updateViaCache: 'none' }).catch(err => {
+      console.warn('Service Worker 註冊失敗（退回 Layer 1 一般快取）：', err);
+    });
   }, []);
 
   useEffect(() => {
