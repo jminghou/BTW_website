@@ -51,7 +51,7 @@ function PlayerMedia({
 }) {
   const readyRef = useRef(onReady);
   readyRef.current = onReady;
-  const common = `absolute inset-0 h-full w-full border-0 bg-black transition-opacity duration-[800ms] ${opacityClass}`;
+  const common = `absolute inset-0 z-0 h-full w-full border-0 bg-black transition-opacity duration-[800ms] ${opacityClass}`;
 
   if (isImageItem(item)) {
     return (
@@ -66,7 +66,7 @@ function PlayerMedia({
     );
   }
 
-  return <iframe src={item.url} className={common} title={item.filename} />;
+  return <iframe src={item.url} className={common} title={item.filename} sandbox="allow-scripts allow-same-origin" />;
 }
 
 export default function PlayerPage() {
@@ -376,8 +376,8 @@ export default function PlayerPage() {
         />
       )}
 
-      <div className="absolute bottom-2 right-2 bg-black/55 text-white text-[11px] px-2 py-1 rounded pointer-events-none max-w-[70vw] truncate">
-        {data?.screen_name} · {active?.filename ?? '載入中'} · {currentIdx + 1}/{items.length}
+      <div className="absolute bottom-2 right-2 z-[99999] bg-black/70 text-white text-[11px] px-2 py-1 rounded pointer-events-none max-w-[80vw] truncate">
+        {data?.screen_name} · {active?.filename ?? '載入中'} · {currentIdx + 1}/{items.length}（頁內菜色輪播屬正常）
       </div>
       {showStatus && (
         <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-3 py-2 rounded-lg space-y-1 max-w-xs">
