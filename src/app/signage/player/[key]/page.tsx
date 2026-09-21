@@ -123,18 +123,15 @@ export default function PlayerPage() {
         console.error('播放器 API 回傳了別台螢幕的資料，已忽略', json.screen_key);
         return;
       }
+      if (json.status === 'playing' && (json.items ?? []).length === 0) {
+        return;
+      }
       setData(json);
 
       const sig = JSON.stringify((json.items ?? []).map(i => `${i.url}:${i.duration}`));
       if (sig !== playlistSignatureRef.current) {
         playlistSignatureRef.current = sig;
         setCurrentIdx(0);
-        setSlotA({ item: null });
-        setSlotB({ item: null });
-        setActiveSlot('a');
-        setPendingSlot(null);
-        setIsFading(false);
-        transitionStartedRef.current = false;
       }
     } catch (err) {
       console.error('取得排程失敗：', err);

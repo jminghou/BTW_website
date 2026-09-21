@@ -86,9 +86,22 @@ export async function GET(
     const itemLists = await Promise.all(matched.map(async (schedule) => {
       const result = await getPlaylistItemsByPlaylistId(schedule.playlist_id);
       if (!result.success) throw new Error('取得播放清單項目失敗');
-      return (result.data as unknown as RawPlaylistItem[]) ?? [];
+      const rows = (result.data as unknown as RawPlaylistItem[]) ?? [];
+      return { schedule, rows };
     }));
-    const rawItems = itemLists.flat();
+    const withItems = itemLists.filter(entry => entry.rows.length > 0);
+    const rawItems = withItems.flatMap(entry => entry.rows);
+
+    if (rawItems.length === 0) {
+      return NextResponse.json({
+        status: 'idle',
+        message: '目前排程沒有可播放的素材',
+        items: [],
+        screen_key: key,
+        screen_name: screen.name,
+        current_time: new Date().toISOString(),
+      }, { headers: NO_STORE });
+    }
 
     const items = rawItems.map(it => ({
       url: `${assetProxyUrl(it.asset_id, it.blob_url)}&sk=${encodeURIComponent(key)}`,
@@ -100,9 +113,9 @@ export async function GET(
 
     return NextResponse.json({
       status: 'playing',
-      playlist_name: matched.map(s => s.playlist_name).filter(Boolean).join(' + '),
-      playlist_id: matched[0].playlist_id,
-      schedule_id: matched[0].id,
+      playlist_name: withItems.map(entry => entry.schedule.playlist_name).filter(Boolean).join(' + '),
+      playlist_id: withItems[0].schedule.playlist_id,
+      schedule_id: withItems[0].schedule.id,
       items,
       screen_key: key,
       screen_name: screen.name,

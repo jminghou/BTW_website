@@ -24,7 +24,6 @@ function injectReadyHandshakeScript(html: string): string {
 html.__signage-pending,
 html.__signage-pending body {
   background: #000 !important;
-  opacity: 0 !important;
 }
 </style>
 <script>
