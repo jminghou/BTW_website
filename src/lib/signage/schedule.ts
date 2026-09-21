@@ -1,13 +1,14 @@
 /**
  * 排程匹配邏輯
- * 對應 v2.0 backend/api/player.py:38-75
- *
- * 優先順序：
- *   1. 特定日期 (play_date = today) 的排程：優先級最高
- *   2. 日期區間 (start_date <= today <= end_date 且 today 的星期 ∈ days_of_week)
- *   3. 週期性 (days_of_week 包含今日) 的排程
  *
  * 時間視窗：start_time <= 現在 <= end_time
+ * 日期條件（三種擇一）：
+ *   1. 特定日期 (play_date = today)
+ *   2. 日期區間 (start_date <= today <= end_date 且 today 的星期 ∈ days_of_week)
+ *   3. 週期性 (days_of_week 包含今日)
+ *
+ * 同一時段若有多筆都符合，全部納入輪播（指定單日的清單先播，再日期區間、再每週循環）。
+ * 同一播放清單只會出現一次。
  */
 
 export interface ScheduleRow {
@@ -139,62 +140,74 @@ function dayMatches(schedule: ScheduleRow, currentDay: number): boolean {
   }
 }
 
+function inTimeWindow(schedule: ScheduleRow, currentTime: string): boolean {
+  const startTime = toTimeString(schedule.start_time);
+  const endTime = toTimeString(schedule.end_time);
+  return startTime <= currentTime && currentTime <= endTime;
+}
+
+/** 0 = 指定單日（先播）、1 = 日期區間、2 = 每週循環 */
+function schedulePriority(schedule: ScheduleRow): number {
+  if (toDateString(schedule.play_date)) return 0;
+  if (toDateString(schedule.start_date) && toDateString(schedule.end_date)) return 1;
+  return 2;
+}
+
+function scheduleAppliesToday(
+  schedule: ScheduleRow,
+  currentDate: string,
+  currentDay: number,
+): boolean {
+  const playDate = toDateString(schedule.play_date);
+  if (playDate) return playDate === currentDate;
+
+  const startDate = toDateString(schedule.start_date);
+  const endDate = toDateString(schedule.end_date);
+  if (startDate && endDate) {
+    return startDate <= currentDate && currentDate <= endDate && dayMatches(schedule, currentDay);
+  }
+
+  return dayMatches(schedule, currentDay);
+}
+
 /**
- * 主匹配函式：從一組排程中挑出當前該播的那一筆
- * 找不到時回傳 null
+ * 找出當前時段所有該播的排程（撞期時合併輪播）。
+ * 排序：指定單日 → 日期區間 → 每週循環，同層再依 id。
+ * 同一 playlist_id 只保留優先序較高的那一筆。
+ */
+export function matchSchedules(
+  schedules: ScheduleRow[],
+  now: Date = new Date(),
+): ScheduleRow[] {
+  const currentTime = getCurrentTimeString(now);
+  const currentDate = getCurrentDateString(now);
+  const currentDay = getCurrentDayOfWeek(now);
+
+  const matched = schedules.filter(schedule =>
+    inTimeWindow(schedule, currentTime) && scheduleAppliesToday(schedule, currentDate, currentDay),
+  );
+
+  matched.sort((a, b) => {
+    const pa = schedulePriority(a);
+    const pb = schedulePriority(b);
+    if (pa !== pb) return pa - pb;
+    return a.id - b.id;
+  });
+
+  const seen = new Set<number>();
+  return matched.filter(schedule => {
+    if (seen.has(schedule.playlist_id)) return false;
+    seen.add(schedule.playlist_id);
+    return true;
+  });
+}
+
+/**
+ * 相容舊介面：回傳當前該播的第一筆（優先序最高者）。找不到時回傳 null。
  */
 export function matchSchedule(
   schedules: ScheduleRow[],
   now: Date = new Date(),
 ): ScheduleRow | null {
-  const currentTime = getCurrentTimeString(now);
-  const currentDate = getCurrentDateString(now);
-  const currentDay = getCurrentDayOfWeek(now);
-
-  let candidateSpecific: ScheduleRow | null = null;
-  let candidateRange: ScheduleRow | null = null;
-  let candidateRecurring: ScheduleRow | null = null;
-
-  for (const schedule of schedules) {
-    const startTime = toTimeString(schedule.start_time);
-    const endTime = toTimeString(schedule.end_time);
-
-    // 時間視窗檢查
-    if (!(startTime <= currentTime && currentTime <= endTime)) continue;
-
-    const playDate = toDateString(schedule.play_date);
-
-    // 1. 特定日期排程：找到立即採用（最高優先）
-    if (playDate) {
-      if (playDate === currentDate) {
-        candidateSpecific = schedule;
-        break;
-      }
-      // 有指定日期但不是今天 → 略過
-      continue;
-    }
-
-    const startDate = toDateString(schedule.start_date);
-    const endDate = toDateString(schedule.end_date);
-
-    // 2. 日期區間排程：今天落在區間內、且星期符合（次高優先）
-    if (startDate && endDate) {
-      if (
-        !candidateRange &&
-        startDate <= currentDate &&
-        currentDate <= endDate &&
-        dayMatches(schedule, currentDay)
-      ) {
-        candidateRange = schedule;
-      }
-      continue;
-    }
-
-    // 3. 週期性排程：尚未鎖定才記錄
-    if (!candidateRecurring && dayMatches(schedule, currentDay)) {
-      candidateRecurring = schedule;
-    }
-  }
-
-  return candidateSpecific ?? candidateRange ?? candidateRecurring;
+  return matchSchedules(schedules, now)[0] ?? null;
 }

@@ -1,17 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAssetById } from '@/lib/signage/db';
 import { cachedSignageRead } from '@/lib/signage/cache';
+import { contentTypeForFilename, isImageFilename } from '@/lib/signage/mediaType';
 
 /**
  * 素材的 blob 位址：走 Data Cache，寫入素材時自動失效。
  * 這支路由在播放熱路徑上（每個 iframe 載入都會打），原本每次都查一次 DB。
  * 回傳 null 代表確實查無此素材（穩定結果可快取）；連線失敗則丟出錯誤不快取。
  */
-function loadAssetBlobUrl(id: number) {
-  return cachedSignageRead(['asset-blob-url', String(id)], async () => {
+function loadAssetMeta(id: number) {
+  return cachedSignageRead(['asset-meta', String(id)], async () => {
     const result = await getAssetById(id);
     if (result.success && result.data) {
-      return (result.data as unknown as { blob_url: string }).blob_url;
+      const row = result.data as unknown as { blob_url: string; filename: string };
+      return { blob_url: row.blob_url, filename: row.filename };
     }
     if (result.error === '找不到指定的素材') return null;
     throw new Error('讀取素材失敗');
@@ -152,14 +154,33 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const hasVersion = req.nextUrl.searchParams.has('v');
 
   try {
-    const blobUrl = await loadAssetBlobUrl(id);
-    if (!blobUrl) {
+    const asset = await loadAssetMeta(id);
+    if (!asset) {
       return new NextResponse('Asset not found', { status: 404 });
     }
 
-    const blobRes = await fetch(blobUrl);
+    const blobRes = await fetch(asset.blob_url);
     if (!blobRes.ok) {
       return new NextResponse(`Failed to fetch from Blob (${blobRes.status})`, { status: 502 });
+    }
+
+    const cacheHeaders = {
+      'Content-Disposition': 'inline',
+      'Cache-Control': hasVersion
+        ? 'public, max-age=31536000, immutable'
+        : 'public, max-age=60, s-maxage=60',
+      'X-Content-Type-Options': 'nosniff',
+    } as const;
+
+    if (isImageFilename(asset.filename)) {
+      const body = await blobRes.arrayBuffer();
+      return new NextResponse(new Uint8Array(body), {
+        status: 200,
+        headers: {
+          'Content-Type': contentTypeForFilename(asset.filename),
+          ...cacheHeaders,
+        },
+      });
     }
 
     const html = await blobRes.text();
@@ -184,11 +205,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       status: 200,
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
-        'Content-Disposition': 'inline',
-        'Cache-Control': hasVersion
-          ? 'public, max-age=31536000, immutable'
-          : 'public, max-age=60, s-maxage=60',
-        'X-Content-Type-Options': 'nosniff',
+        ...cacheHeaders,
       },
     });
   } catch (error) {

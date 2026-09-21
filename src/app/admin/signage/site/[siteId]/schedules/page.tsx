@@ -620,7 +620,7 @@ export default function SiteSchedulesPage() {
                   ))}
                 </div>
                 <p className="text-xs text-gray-400 mt-1">
-                  優先順序：指定單日 ＞ 日期區間 ＞ 每週循環（同一時段多筆排程時，較精準者優先）
+                  同一時段有多筆排程時，會把各清單接在一起輪播：指定單日先播，再日期區間，再每週循環。
                 </p>
               </div>
 

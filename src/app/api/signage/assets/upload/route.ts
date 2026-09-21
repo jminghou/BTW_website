@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { deleteAssetBlob, uploadAsset } from '@/lib/signage/storage';
 import { getSites, upsertAssetByFilename } from '@/lib/signage/db';
+import { isAllowedUploadFilename } from '@/lib/signage/mediaType';
 
 /**
  * 上傳素材
  * POST /api/signage/assets/upload
  *
  * Body (multipart/form-data):
- *   - file: 檔案 (.html)
+ *   - file: 檔案（.html / .png / .jpg / .jpeg）
  *   - site_id: 廠區 ID（必填）
  *   - description: 說明（選填）
  *
@@ -42,8 +43,8 @@ export async function POST(req: NextRequest) {
 
     for (const file of files) {
       // 基本驗證：副檔名與大小
-      if (!file.name.toLowerCase().endsWith('.html')) {
-        failed.push({ filename: file.name, error: '僅支援 .html 檔案' });
+      if (!isAllowedUploadFilename(file.name)) {
+        failed.push({ filename: file.name, error: '僅支援 .html、.png、.jpg 檔案' });
         continue;
       }
       if (file.size > 50 * 1024 * 1024) {

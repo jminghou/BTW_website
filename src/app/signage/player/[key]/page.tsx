@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
+import { isImageFilename, type SignageMediaKind } from '@/lib/signage/mediaType';
 
 interface PlayerItem {
   url: string;
   duration: number;
   filename: string;
   description: string | null;
+  kind?: SignageMediaKind;
 }
 
 interface PlayerResponse {
@@ -30,6 +32,11 @@ type SlotName = 'a' | 'b';
 type FrameSlot = {
   item: PlayerItem | null;
 };
+
+function isImageItem(item: PlayerItem | null | undefined): boolean {
+  if (!item) return false;
+  return item.kind === 'image' || isImageFilename(item.filename);
+}
 
 export default function PlayerPage() {
   const params = useParams<{ key: string }>();
@@ -59,8 +66,8 @@ export default function PlayerPage() {
       const json: PlayerResponse = await res.json();
       setData(json);
 
-      // 若播放清單內容有變，重置 index 從頭開始播
-      const sig = JSON.stringify(json.items?.map(i => i.url) ?? []);
+      // 清單網址或秒數有變就重置，避免改秒數後仍卡在上一輪的長計時
+      const sig = JSON.stringify((json.items ?? []).map(i => `${i.url}:${i.duration}`));
       if (sig !== playlistSignatureRef.current) {
         playlistSignatureRef.current = sig;
         setCurrentIdx(0);
@@ -109,9 +116,10 @@ export default function PlayerPage() {
     }).catch(() => {});
   }, [data]);
 
+  const rotationKey = items.map(i => `${i.url}:${i.duration}`).join('|');
+
   // ------- 輪播切換邏輯 -------
   useEffect(() => {
-    const items = data?.items ?? [];
     if (items.length === 0) return;
 
     const duration = Math.max(1, items[currentIdx]?.duration ?? 10) * 1000;
@@ -119,7 +127,7 @@ export default function PlayerPage() {
       setCurrentIdx(i => (i + 1) % items.length);
     }, duration);
     return () => clearTimeout(timer);
-  }, [currentIdx, data]);
+  }, [currentIdx, rotationKey]);
 
   // ------- 雙緩衝轉場：預載入新素材後再淡入淡出 -------
   const current = items[currentIdx];
@@ -278,19 +286,41 @@ export default function PlayerPage() {
   return (
     <div className="fixed inset-0 w-screen h-screen bg-black">
       {slotA.item && (
-        <iframe
-          src={slotASrc}
-          className={`absolute inset-0 w-full h-full border-0 transition-opacity ${transitionDurationClass} ${slotAOpacity}`}
-          title={slotA.item.filename}
-        />
+        isImageItem(slotA.item) ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={slotASrc}
+            alt={slotA.item.filename}
+            className={`absolute inset-0 w-full h-full object-contain bg-black transition-opacity ${transitionDurationClass} ${slotAOpacity}`}
+            onLoad={() => { if (pendingSlot === 'a') startTransition(); }}
+            onError={() => { if (pendingSlot === 'a') startTransition(); }}
+          />
+        ) : (
+          <iframe
+            src={slotASrc}
+            className={`absolute inset-0 w-full h-full border-0 transition-opacity ${transitionDurationClass} ${slotAOpacity}`}
+            title={slotA.item.filename}
+          />
+        )
       )}
 
       {slotB.item && (
-        <iframe
-          src={slotBSrc}
-          className={`absolute inset-0 w-full h-full border-0 transition-opacity ${transitionDurationClass} ${slotBOpacity}`}
-          title={slotB.item.filename}
-        />
+        isImageItem(slotB.item) ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={slotBSrc}
+            alt={slotB.item.filename}
+            className={`absolute inset-0 w-full h-full object-contain bg-black transition-opacity ${transitionDurationClass} ${slotBOpacity}`}
+            onLoad={() => { if (pendingSlot === 'b') startTransition(); }}
+            onError={() => { if (pendingSlot === 'b') startTransition(); }}
+          />
+        ) : (
+          <iframe
+            src={slotBSrc}
+            className={`absolute inset-0 w-full h-full border-0 transition-opacity ${transitionDurationClass} ${slotBOpacity}`}
+            title={slotB.item.filename}
+          />
+        )
       )}
 
       {showStatus && (

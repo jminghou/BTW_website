@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAssetById } from '@/lib/signage/db';
 import { screenshotAssetUrl } from '@/lib/signage/screenshot';
+import { isImageFilename } from '@/lib/signage/mediaType';
 
 /**
  * 素材轉檔（瀏覽器螢幕快照）
@@ -24,6 +25,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     return NextResponse.json({ success: false, message: '找不到指定的素材' }, { status: 404 });
   }
   const asset = result.data as { id: number; filename: string; blob_url: string };
+  if (isImageFilename(asset.filename)) {
+    return NextResponse.json({ success: false, message: '圖片素材無需轉檔' }, { status: 400 });
+  }
 
   // 用素材代理 URL 渲染：proxy 會把相對資源路徑改寫成絕對路徑、並回傳可內嵌的 text/html，
   // Chromium 直接載入即得到與前台 iframe 完全一致的畫面。

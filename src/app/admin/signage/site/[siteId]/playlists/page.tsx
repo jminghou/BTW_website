@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { matchFilename } from '@/lib/signage/filenameFilter';
+import { isImageFilename } from '@/lib/signage/mediaType';
 
 interface Playlist {
   id: number;
@@ -24,7 +25,12 @@ interface PlaylistItem {
   order: number;
 }
 
-const DEFAULT_DURATION = 180; // 所有新增清單項目預設 180 秒
+const DEFAULT_DURATION = 180; // HTML 菜單預設 180 秒
+const IMAGE_DEFAULT_DURATION = 10; // 圖片輪播預設 10 秒
+
+function durationForAsset(filename: string): number {
+  return isImageFilename(filename) ? IMAGE_DEFAULT_DURATION : DEFAULT_DURATION;
+}
 
 export default function SitePlaylistsPage() {
   const params = useParams<{ siteId: string }>();
@@ -233,7 +239,7 @@ export default function SitePlaylistsPage() {
   const addItem = (assetId: number) => {
     const asset = availableAssets.find(a => a.id === assetId);
     if (!asset) return;
-    setItems(prev => [...prev, { asset_id: assetId, filename: asset.filename, duration_seconds: DEFAULT_DURATION, order: prev.length }]);
+    setItems(prev => [...prev, { asset_id: assetId, filename: asset.filename, duration_seconds: durationForAsset(asset.filename), order: prev.length }]);
   };
   const removeItem = (idx: number) => setItems(prev => prev.filter((_, i) => i !== idx).map((it, i) => ({ ...it, order: i })));
   const moveItem = (idx: number, dir: -1 | 1) => {
@@ -259,7 +265,7 @@ export default function SitePlaylistsPage() {
   };
 
   const batchPick = (a: Asset) => {
-    setBatchPicked(prev => [...prev, { asset_id: a.id, filename: a.filename, duration_seconds: DEFAULT_DURATION }]);
+    setBatchPicked(prev => [...prev, { asset_id: a.id, filename: a.filename, duration_seconds: durationForAsset(a.filename) }]);
   };
   const batchUnpick = (idx: number) => setBatchPicked(prev => prev.filter((_, i) => i !== idx));
   const batchUpdateDuration = (idx: number, v: number) =>
@@ -490,6 +496,9 @@ export default function SitePlaylistsPage() {
                 <div key={`${it.asset_id}-${idx}`} className="flex items-center gap-2 bg-gray-50 p-3 rounded-lg">
                   <span className="text-gray-400 w-6">{idx + 1}</span>
                   <span className="flex-1 font-mono text-sm text-gray-700 truncate">{it.filename}</span>
+                  {it.filename && isImageFilename(it.filename) && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">圖片</span>
+                  )}
                   <div className="flex items-center gap-1 text-sm">
                     <input type="number" min={1} value={it.duration_seconds} onChange={e => updateDuration(idx, Number(e.target.value))}
                       className="w-20 px-2 py-1 border border-gray-300 rounded text-right" />
@@ -540,6 +549,7 @@ export default function SitePlaylistsPage() {
                     .filter(a => a.filename.toLowerCase().includes(batchSearch.toLowerCase()))
                     .map(a => {
                       const isVideo = /\.(mp4|webm|mov|m4v)$/i.test(a.filename);
+                      const isImage = isImageFilename(a.filename);
                       return (
                         <button
                           key={a.id}
@@ -550,12 +560,15 @@ export default function SitePlaylistsPage() {
                           <div className="w-16 h-12 bg-gray-100 rounded flex items-center justify-center overflow-hidden flex-shrink-0">
                             {isVideo ? (
                               <span className="text-2xl">🎬</span>
-                            ) : (
+                            ) : isImage ? (
                               // eslint-disable-next-line @next/next/no-img-element
                               <img src={a.blob_url} alt={a.filename} className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="text-xl">📄</span>
                             )}
                           </div>
                           <span className="flex-1 text-sm truncate font-mono">{a.filename}</span>
+                          {isImage && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">圖片</span>}
                           <span className="text-indigo-600 text-sm">＋</span>
                         </button>
                       );
@@ -579,6 +592,9 @@ export default function SitePlaylistsPage() {
                       <div key={`${it.asset_id}-${idx}`} className="flex items-center gap-2 p-2">
                         <span className="text-gray-400 w-6 text-sm">{idx + 1}</span>
                         <span className="flex-1 font-mono text-sm truncate">{it.filename}</span>
+                        {isImageFilename(it.filename) && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">圖片</span>
+                        )}
                         <input
                           type="number"
                           min={1}

@@ -1,4 +1,5 @@
 import { put, del } from '@vercel/blob';
+import { contentTypeForFilename } from '@/lib/signage/mediaType';
 
 /**
  * Vercel Blob 儲存封裝
@@ -20,7 +21,7 @@ export async function uploadAsset(
 
     const blob = await put(path, data as Blob, {
       access: 'public',
-      contentType: 'text/html; charset=utf-8',
+      contentType: contentTypeForFilename(filename),
       addRandomSuffix: false,
     });
 

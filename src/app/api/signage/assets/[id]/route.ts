@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { deleteAsset, getAssetById, getSiteById, updateAssetBlobUrl } from '@/lib/signage/db';
 import { deleteAssetBlob, uploadAsset } from '@/lib/signage/storage';
+import { isImageFilename } from '@/lib/signage/mediaType';
 
 /**
  * 取得單一素材的原始 HTML 內容（供後台編輯用）
@@ -21,6 +22,9 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     }
 
     const asset = result.data as { id: number; filename: string; blob_url: string };
+    if (isImageFilename(asset.filename)) {
+      return NextResponse.json({ success: false, message: '圖片素材不支援 HTML 編輯' }, { status: 400 });
+    }
     const blobRes = await fetch(asset.blob_url, { cache: 'no-store' });
     if (!blobRes.ok) {
       return NextResponse.json(
@@ -66,6 +70,9 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       return NextResponse.json({ success: false, message: '找不到指定的素材' }, { status: 404 });
     }
     const asset = assetResult.data as { id: number; site_id: number | null; filename: string; blob_url: string };
+    if (isImageFilename(asset.filename)) {
+      return NextResponse.json({ success: false, message: '圖片素材不支援 HTML 編輯' }, { status: 400 });
+    }
 
     // 取得廠區代號作為 Blob 路徑前綴（沒有所屬廠區時退回 'shared'）
     let siteCode = 'shared';

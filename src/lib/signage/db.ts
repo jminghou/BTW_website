@@ -1,6 +1,7 @@
 import { neon } from '@neondatabase/serverless';
 import { randomUUID } from 'crypto';
 import { revalidateSignage } from './cache';
+import { isImageFilename } from './mediaType';
 
 /**
  * 數位看版系統資料庫工具
@@ -955,14 +956,19 @@ export async function createPlaylistsFromAssetIds(assetIds: number[], durationSe
     `) as Array<{ id: number; site_id: number; name: string }>;
 
     const pidByKey = new Map(inserted.map(p => [`${p.site_id}|${p.name}`, p.id]));
+    const filenameById = new Map(assets.map(a => [a.id, a.filename]));
     const itemRows = toCreate
-      .map(t => ({ playlist_id: pidByKey.get(`${t.site_id}|${t.name}`), asset_id: t.asset_id }))
-      .filter((r): r is { playlist_id: number; asset_id: number } => r.playlist_id != null);
+      .map(t => ({
+        playlist_id: pidByKey.get(`${t.site_id}|${t.name}`),
+        asset_id: t.asset_id,
+        duration: isImageFilename(filenameById.get(t.asset_id)) ? 10 : dur,
+      }))
+      .filter((r): r is { playlist_id: number; asset_id: number; duration: number } => r.playlist_id != null);
 
     // 批次插入清單項目（單次往返）
     await sql`
       INSERT INTO signage_playlist_items (playlist_id, asset_id, duration_seconds, "order")
-      SELECT (x->>'playlist_id')::int, (x->>'asset_id')::int, ${dur}, 0
+      SELECT (x->>'playlist_id')::int, (x->>'asset_id')::int, (x->>'duration')::int, 0
       FROM jsonb_array_elements(${JSON.stringify(itemRows)}::jsonb) AS x;
     `;
 

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { assetProxyUrl } from '@/lib/signage/assetVersion';
 import { extractFilenameDate, matchFilename } from '@/lib/signage/filenameFilter';
+import { isImageFilename } from '@/lib/signage/mediaType';
 
 interface Asset {
   id: number;
@@ -422,7 +423,7 @@ export default function SiteAssetsPage() {
   // 記住上一次點選的列索引，作為 Shift 範圍選取的錨點
   const lastIndexRef = useRef<number | null>(null);
 
-  const [uploadMode, setUploadMode] = useState<'html' | 'json'>('html');
+  const [uploadMode, setUploadMode] = useState<'html' | 'json' | 'image'>('html');
   const [uploadDesc, setUploadDesc] = useState('');
   const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState('');
@@ -465,7 +466,7 @@ export default function SiteAssetsPage() {
     })();
   }, []);
 
-  const switchMode = (mode: 'html' | 'json') => {
+  const switchMode = (mode: 'html' | 'json' | 'image') => {
     setUploadMode(mode);
     setUploadResult('');
     setUploadDetail([]);
@@ -501,7 +502,7 @@ export default function SiteAssetsPage() {
         }
         for (const f of json.data.failed ?? []) lines.push(`❌ ${f.filename}：${f.error}`);
         setUploadDetail(lines);
-      } else if (uploadMode === 'html' && json.data?.failed?.length) {
+      } else if ((uploadMode === 'html' || uploadMode === 'image') && json.data?.failed?.length) {
         setUploadDetail(json.data.failed.map((f: { filename: string; error: string }) => `❌ ${f.filename}：${f.error}`));
       }
 
@@ -1010,7 +1011,11 @@ export default function SiteAssetsPage() {
   const handleBatchScreenshot = async () => {
     if (selectedIds.size === 0 || batchShooting) return;
     // 依目前列表順序處理選取項目
-    const targets = assets.filter(a => selectedIds.has(a.id));
+    const targets = assets.filter(a => selectedIds.has(a.id) && !isImageFilename(a.filename));
+    if (targets.length === 0) {
+      alert('選取的項目都是圖片，無需轉檔');
+      return;
+    }
     setBatchShooting(true);
     setBatchMsg(`轉檔中… 0/${targets.length}`);
     try {
@@ -1093,6 +1098,10 @@ export default function SiteAssetsPage() {
             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${uploadMode === 'html' ? 'border-cyan-600 text-cyan-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
             直接上傳 HTML
           </button>
+          <button type="button" onClick={() => switchMode('image')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${uploadMode === 'image' ? 'border-cyan-600 text-cyan-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+            上傳圖片
+          </button>
           <button type="button" onClick={() => switchMode('json')}
             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${uploadMode === 'json' ? 'border-cyan-600 text-cyan-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
             上傳 JSON 自動轉檔
@@ -1100,11 +1109,16 @@ export default function SiteAssetsPage() {
         </div>
 
         <form onSubmit={handleUpload} className="space-y-4">
-          {uploadMode === 'html' && (
+          {(uploadMode === 'html' || uploadMode === 'image') && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">說明（選填）</label>
               <input type="text" value={uploadDesc} onChange={e => setUploadDesc(e.target.value)}
                 className="w-full md:w-1/2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500" />
+            </div>
+          )}
+          {uploadMode === 'image' && (
+            <div className="bg-blue-50 border border-blue-200 text-blue-800 text-sm rounded-lg px-4 py-3">
+              支援 PNG、JPG。上傳後可加入播放清單，並可與 HTML 菜單混在同一份清單裡輪播；切換時使用淡入淡出。
             </div>
           )}
           {uploadMode === 'json' && (
@@ -1142,9 +1156,19 @@ export default function SiteAssetsPage() {
           )}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              {uploadMode === 'json' ? '選擇 JSON 檔（可一次選多個 .json） *' : '選擇檔案（可一次選多個 .html） *'}
+              {uploadMode === 'json'
+                ? '選擇 JSON 檔（可一次選多個 .json） *'
+                : uploadMode === 'image'
+                  ? '選擇圖片（可一次選多個 .png / .jpg） *'
+                  : '選擇檔案（可一次選多個 .html） *'}
             </label>
-            <input ref={fileInputRef} type="file" accept={uploadMode === 'json' ? '.json,application/json' : '.html'} multiple required
+            <input ref={fileInputRef} type="file" accept={
+              uploadMode === 'json'
+                ? '.json,application/json'
+                : uploadMode === 'image'
+                  ? '.png,.jpg,.jpeg,image/png,image/jpeg'
+                  : '.html'
+            } multiple required
               className="w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-cyan-50 file:text-cyan-700 hover:file:bg-cyan-100" />
           </div>
           <button type="submit" disabled={uploading}
@@ -1254,6 +1278,9 @@ export default function SiteAssetsPage() {
                   <div className="break-all overflow-hidden [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] leading-5">
                     {a.filename}
                   </div>
+                  {isImageFilename(a.filename) && (
+                    <span className="mt-1 inline-block text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">圖片</span>
+                  )}
                 </td>
                 <td className="px-3 py-3 text-gray-600 text-[11px] align-top" title={a.description || '—'}>
                   <div className="break-all overflow-hidden [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] leading-4">
@@ -1270,11 +1297,15 @@ export default function SiteAssetsPage() {
                 </td>
                 <td className="px-3 py-3 text-right whitespace-nowrap align-top">
                   <a href={assetProxyUrl(a.id, a.blob_url)} target="_blank" rel="noopener noreferrer" className="text-cyan-600 hover:underline mr-3">預覽</a>
-                  <button onClick={() => openEdit(a)} className="text-amber-600 hover:underline mr-3">編輯</button>
-                  <button onClick={() => handleScreenshot(a)} disabled={shotId === a.id}
-                    className="text-indigo-600 hover:underline mr-3 disabled:opacity-50">
-                    {shotId === a.id ? '轉檔中…' : '轉檔'}
-                  </button>
+                  {!isImageFilename(a.filename) && (
+                    <>
+                      <button onClick={() => openEdit(a)} className="text-amber-600 hover:underline mr-3">編輯</button>
+                      <button onClick={() => handleScreenshot(a)} disabled={shotId === a.id}
+                        className="text-indigo-600 hover:underline mr-3 disabled:opacity-50">
+                        {shotId === a.id ? '轉檔中…' : '轉檔'}
+                      </button>
+                    </>
+                  )}
                   <button onClick={() => handleDeleteOne(a.id)} className="text-red-600 hover:underline">刪除</button>
                 </td>
               </tr>

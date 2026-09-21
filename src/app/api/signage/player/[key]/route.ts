@@ -4,8 +4,9 @@ import {
   getSchedulesByScreenKey,
   getPlaylistItemsByPlaylistId,
 } from '@/lib/signage/db';
-import { matchSchedule, type ScheduleRow } from '@/lib/signage/schedule';
+import { matchSchedules, type ScheduleRow } from '@/lib/signage/schedule';
 import { assetProxyUrl } from '@/lib/signage/assetVersion';
+import { signageMediaKind } from '@/lib/signage/mediaType';
 import { cachedSignageRead, revalidateSignage } from '@/lib/signage/cache';
 
 /**
@@ -106,9 +107,9 @@ export async function GET(
       }, { status: 404 });
     }
 
-    // 2. 匹配當前排程（相依於「現在幾點」，所以每次請求都要重算，不能快取結果）
-    const matched = matchSchedule(schedules);
-    if (!matched) {
+    // 2. 匹配當前時段所有排程（撞期時合併輪播；相依於「現在幾點」，每次都要重算）
+    const matched = matchSchedules(schedules);
+    if (matched.length === 0) {
       return NextResponse.json({
         status: 'idle',
         message: '目前無排程',
@@ -118,18 +119,22 @@ export async function GET(
       }, { headers: NO_STORE });
     }
 
-    // 3. 取出該排程對應的播放清單項目
-    let rawItems = await loadPlaylistItems(matched.playlist_id);
-    // 播放端快取不會自動到期。若清單曾以「空陣列」被快住（例如素材是之後才加進去、
-    // 或寫入發生在別的部署而沒打到這台的 tag 失效），這裡補一次直讀 DB。
-    // 只有真的讀到內容才整組失效，避免「本來就沒素材」的排程每分鐘打爆快取。
-    if (rawItems.length === 0) {
-      const fresh = await getPlaylistItemsByPlaylistId(matched.playlist_id);
-      if (fresh.success && Array.isArray(fresh.data) && fresh.data.length > 0) {
-        rawItems = fresh.data as unknown as RawPlaylistItem[];
-        revalidateSignage();
+    // 3. 依優先序取出各清單項目，接成一輪
+    const itemLists = await Promise.all(matched.map(async (schedule) => {
+      let rawItems = await loadPlaylistItems(schedule.playlist_id);
+      // 播放端快取不會自動到期。若清單曾以「空陣列」被快住（例如素材是之後才加進去、
+      // 或寫入發生在別的部署而沒打到這台的 tag 失效），這裡補一次直讀 DB。
+      // 只有真的讀到內容才整組失效，避免「本來就沒素材」的排程每分鐘打爆快取。
+      if (rawItems.length === 0) {
+        const fresh = await getPlaylistItemsByPlaylistId(schedule.playlist_id);
+        if (fresh.success && Array.isArray(fresh.data) && fresh.data.length > 0) {
+          rawItems = fresh.data as unknown as RawPlaylistItem[];
+          revalidateSignage();
+        }
       }
-    }
+      return rawItems;
+    }));
+    const rawItems = itemLists.flat();
 
     // 透過 proxy 路由提供 .html，避免 Vercel Blob 的 attachment disposition
     // 讓 iframe 能正常嵌入渲染（而非觸發下載）。
@@ -140,13 +145,14 @@ export async function GET(
       duration: it.duration_seconds,
       filename: it.filename,
       description: it.description,
+      kind: signageMediaKind(it.filename),
     }));
 
     return NextResponse.json({
       status: 'playing',
-      playlist_name: matched.playlist_name,
-      playlist_id: matched.playlist_id,
-      schedule_id: matched.id,
+      playlist_name: matched.map(s => s.playlist_name).filter(Boolean).join(' + '),
+      playlist_id: matched[0].playlist_id,
+      schedule_id: matched[0].id,
       items,
       screen_name: screen.name,
       current_time: new Date().toISOString(),
