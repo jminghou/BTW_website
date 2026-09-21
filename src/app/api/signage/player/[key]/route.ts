@@ -3,6 +3,7 @@ import {
   getScreenByKey,
   getSchedulesByScreenKey,
   getPlaylistItemsByPlaylistId,
+  getAssetByFilename,
 } from '@/lib/signage/db';
 import { matchSchedules, type ScheduleRow } from '@/lib/signage/schedule';
 import { assetProxyUrl } from '@/lib/signage/assetVersion';
@@ -86,7 +87,23 @@ export async function GET(
     const itemLists = await Promise.all(matched.map(async (schedule) => {
       const result = await getPlaylistItemsByPlaylistId(schedule.playlist_id);
       if (!result.success) throw new Error('取得播放清單項目失敗');
-      const rows = (result.data as unknown as RawPlaylistItem[]) ?? [];
+      let rows = (result.data as unknown as RawPlaylistItem[]) ?? [];
+      // 清單是空的（例如素材建在另一個廠區）時，用清單名找同名素材來播，避免黑屏。
+      if (rows.length === 0 && schedule.playlist_name) {
+        const found = await getAssetByFilename(schedule.playlist_name);
+        if (found.success && found.data) {
+          const asset = found.data as {
+            id: number; filename: string; blob_url: string; description: string | null;
+          };
+          rows = [{
+            asset_id: asset.id,
+            filename: asset.filename,
+            blob_url: asset.blob_url,
+            duration_seconds: signageMediaKind(asset.filename) === 'image' ? 10 : 180,
+            description: asset.description,
+          }];
+        }
+      }
       return { schedule, rows };
     }));
     const withItems = itemLists.filter(entry => entry.rows.length > 0);

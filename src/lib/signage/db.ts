@@ -589,6 +589,27 @@ export async function getAssets(siteId?: number) {
   }
 }
 
+export async function getAssetByFilename(filename: string) {
+  try {
+    const name = String(filename || '').trim();
+    if (!name) return { success: false, error: '缺少檔名' };
+    const result = await sql`
+      SELECT id, site_id, filename, blob_url, description, upload_timestamp
+      FROM signage_assets
+      WHERE filename = ${name}
+      ORDER BY upload_timestamp DESC
+      LIMIT 1;
+    `;
+    if (result.length === 0) {
+      return { success: false, error: '找不到指定的素材' };
+    }
+    return { success: true, data: result[0] };
+  } catch (error) {
+    console.error('依檔名取得素材時發生錯誤：', error);
+    return { success: false, error };
+  }
+}
+
 export async function getAssetById(id: number) {
   try {
     const result = await sql`
