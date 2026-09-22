@@ -370,9 +370,6 @@ export default function PlayerPage() {
         />
       )}
 
-      <div className="absolute bottom-2 right-2 z-[99999] bg-black/70 text-white text-[11px] px-2 py-1 rounded pointer-events-none max-w-[80vw] truncate">
-        {data?.screen_name} · {active?.filename ?? '載入中'} · {currentIdx + 1}/{items.length}（頁內菜色輪播屬正常）
-      </div>
       {showStatus && (
         <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-3 py-2 rounded-lg space-y-1 max-w-xs">
           <div>螢幕：{data?.screen_name}</div>
