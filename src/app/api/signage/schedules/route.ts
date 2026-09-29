@@ -38,7 +38,8 @@ export async function POST(req: NextRequest) {
     if (result.success) {
       return NextResponse.json({ success: true, data: result.data, message: '排程建立成功' }, { status: 201 });
     }
-    return NextResponse.json({ success: false, message: '建立排程失敗', error: result.error }, { status: 500 });
+    const message = typeof result.error === 'string' ? result.error : '建立排程失敗';
+    return NextResponse.json({ success: false, message }, { status: typeof result.error === 'string' ? 400 : 500 });
   } catch (error) {
     console.error('排程 API 錯誤：', error);
     return NextResponse.json({ success: false, message: '伺服器內部錯誤' }, { status: 500 });

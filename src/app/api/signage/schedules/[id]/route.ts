@@ -10,10 +10,9 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     const body = await req.json();
     const result = await updateSchedule(id, body);
     if (result.success) return NextResponse.json({ success: true, data: result.data });
-    return NextResponse.json({
-      success: false,
-      message: typeof result.error === 'string' ? result.error : '更新失敗',
-    }, { status: 404 });
+    const message = typeof result.error === 'string' ? result.error : '更新失敗';
+    const status = message === '找不到指定的排程' ? 404 : (typeof result.error === 'string' ? 400 : 500);
+    return NextResponse.json({ success: false, message }, { status });
   } catch (error) {
     console.error('排程 API 錯誤：', error);
     return NextResponse.json({ success: false, message: '伺服器內部錯誤' }, { status: 500 });

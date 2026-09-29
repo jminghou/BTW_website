@@ -3,7 +3,6 @@ import {
   getScreenByKey,
   getSchedulesByScreenKey,
   getPlaylistItemsByPlaylistId,
-  getAssetByFilename,
 } from '@/lib/signage/db';
 import { matchSchedules, type ScheduleRow } from '@/lib/signage/schedule';
 import { assetProxyUrl } from '@/lib/signage/assetVersion';
@@ -19,12 +18,14 @@ export const revalidate = 0;
 
 interface ScreenRow {
   id: number;
+  site_id: number;
   name: string;
   unique_key: string;
 }
 
 interface RawPlaylistItem {
   asset_id: number;
+  site_id: number | null;
   filename: string;
   blob_url: string;
   duration_seconds: number;
@@ -69,8 +70,10 @@ export async function GET(
 
     const scheduleResult = await getSchedulesByScreenKey(key);
     if (!scheduleResult.success) throw new Error('取得排程失敗');
-    const schedules = ((scheduleResult.data as unknown as ScheduleRow[]) ?? [])
-      .filter(s => s.screen_id === screen.id);
+    const siteId = Number(screen.site_id);
+    // 只播這台螢幕所屬廠區的清單與素材。別廠的排程、空清單同名補檔都不會進來。
+    const schedules = ((scheduleResult.data as unknown as (ScheduleRow & { playlist_site_id?: number })[]) ?? [])
+      .filter(s => s.screen_id === screen.id && Number(s.playlist_site_id) === siteId);
 
     const matched = matchSchedules(schedules);
     if (matched.length === 0) {
@@ -85,25 +88,10 @@ export async function GET(
     }
 
     const itemLists = await Promise.all(matched.map(async (schedule) => {
-      const result = await getPlaylistItemsByPlaylistId(schedule.playlist_id);
+      const result = await getPlaylistItemsByPlaylistId(schedule.playlist_id, siteId);
       if (!result.success) throw new Error('取得播放清單項目失敗');
-      let rows = (result.data as unknown as RawPlaylistItem[]) ?? [];
-      // 清單是空的（例如素材建在另一個廠區）時，用清單名找同名素材來播，避免黑屏。
-      if (rows.length === 0 && schedule.playlist_name) {
-        const found = await getAssetByFilename(schedule.playlist_name);
-        if (found.success && found.data) {
-          const asset = found.data as {
-            id: number; filename: string; blob_url: string; description: string | null;
-          };
-          rows = [{
-            asset_id: asset.id,
-            filename: asset.filename,
-            blob_url: asset.blob_url,
-            duration_seconds: signageMediaKind(asset.filename) === 'image' ? 10 : 180,
-            description: asset.description,
-          }];
-        }
-      }
+      const rows = ((result.data as unknown as RawPlaylistItem[]) ?? [])
+        .filter(row => Number(row.site_id) === siteId);
       return { schedule, rows };
     }));
     const withItems = itemLists.filter(entry => entry.rows.length > 0);

@@ -33,10 +33,8 @@ export async function POST(req: NextRequest) {
 
     const result = await batchAppendItemsToPlaylists(playlistIds, items);
     if (!result.success) {
-      return NextResponse.json({
-        success: false,
-        message: typeof result.error === 'string' ? result.error : '批次加入失敗',
-      }, { status: 500 });
+      const message = typeof result.error === 'string' ? result.error : '批次加入失敗';
+      return NextResponse.json({ success: false, message }, { status: typeof result.error === 'string' ? 400 : 500 });
     }
 
     const data = result.data as { playlist_count: number; item_count: number; inserted: number };

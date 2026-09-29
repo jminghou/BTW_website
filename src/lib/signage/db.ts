@@ -589,27 +589,6 @@ export async function getAssets(siteId?: number) {
   }
 }
 
-export async function getAssetByFilename(filename: string) {
-  try {
-    const name = String(filename || '').trim();
-    if (!name) return { success: false, error: '缺少檔名' };
-    const result = await sql`
-      SELECT id, site_id, filename, blob_url, description, upload_timestamp
-      FROM signage_assets
-      WHERE filename = ${name}
-      ORDER BY upload_timestamp DESC
-      LIMIT 1;
-    `;
-    if (result.length === 0) {
-      return { success: false, error: '找不到指定的素材' };
-    }
-    return { success: true, data: result[0] };
-  } catch (error) {
-    console.error('依檔名取得素材時發生錯誤：', error);
-    return { success: false, error };
-  }
-}
-
 export async function getAssetById(id: number) {
   try {
     const result = await sql`
@@ -1020,6 +999,64 @@ export async function autoCreatePlaylistsFromAssets(siteId: number, durationSeco
 }
 
 /**
+ * 素材必須屬於這份播放清單的廠區。通過回傳 null。
+ * 沒有所屬廠區的素材也不能掛進來。
+ */
+async function rejectAssetsOutsidePlaylist(
+  playlistId: number,
+  assetIds: number[],
+): Promise<string | null> {
+  const playlist = await sql`SELECT id, site_id FROM signage_playlists WHERE id = ${playlistId};`;
+  if (playlist.length === 0) return '找不到指定的播放清單';
+  const uniqueIds = Array.from(new Set(assetIds.map(Number).filter(id => Number.isFinite(id) && id > 0)));
+  if (uniqueIds.length === 0) return null;
+  const playlistSiteId = Number((playlist[0] as { site_id: number }).site_id);
+  const assets = await sql`
+    SELECT id, site_id FROM signage_assets WHERE id = ANY(${uniqueIds});
+  ` as Array<{ id: number; site_id: number | null }>;
+  if (assets.length !== uniqueIds.length) return '找不到指定的素材';
+  if (assets.some(asset => Number(asset.site_id) !== playlistSiteId)) {
+    return '素材不屬於這個播放清單的廠區，無法加入';
+  }
+  return null;
+}
+
+/** 播放清單必須和螢幕屬於同一個廠區。通過回傳 null。 */
+async function rejectPlaylistOutsideScreen(
+  screenId: number,
+  playlistId: number,
+): Promise<string | null> {
+  const screen = await sql`SELECT id, site_id FROM signage_screens WHERE id = ${screenId};`;
+  if (screen.length === 0) return '找不到指定的螢幕';
+  const playlist = await sql`SELECT id, site_id FROM signage_playlists WHERE id = ${playlistId};`;
+  if (playlist.length === 0) return '找不到指定的播放清單';
+  if (Number((screen[0] as { site_id: number }).site_id) !== Number((playlist[0] as { site_id: number }).site_id)) {
+    return '播放清單不屬於這台螢幕的廠區，無法建立排程';
+  }
+  return null;
+}
+
+/** 每一台螢幕都必須和這份播放清單屬於同一個廠區。通過回傳 null。 */
+async function rejectPlaylistOutsideScreens(
+  screenIds: number[],
+  playlistId: number,
+): Promise<string | null> {
+  const uniqueIds = Array.from(new Set(screenIds.map(Number).filter(id => Number.isFinite(id) && id > 0)));
+  if (uniqueIds.length === 0) return '未提供要套用的螢幕';
+  const screens = await sql`
+    SELECT id, site_id FROM signage_screens WHERE id = ANY(${uniqueIds});
+  ` as Array<{ id: number; site_id: number }>;
+  if (screens.length !== uniqueIds.length) return '找不到指定的螢幕';
+  const playlist = await sql`SELECT id, site_id FROM signage_playlists WHERE id = ${playlistId};`;
+  if (playlist.length === 0) return '找不到指定的播放清單';
+  const playlistSiteId = Number((playlist[0] as { site_id: number }).site_id);
+  if (screens.some(screen => Number(screen.site_id) !== playlistSiteId)) {
+    return '有螢幕不屬於這份播放清單的廠區，無法套用排程';
+  }
+  return null;
+}
+
+/**
  * 取代整份播放清單的項目（刪除舊的、插入新的）
  * 適合用在拖曳排序後一次性更新
  */
@@ -1028,10 +1065,8 @@ export async function replacePlaylistItems(
   items: { asset_id: number; duration_seconds: number; order: number }[],
 ) {
   try {
-    const playlist = await sql`SELECT id FROM signage_playlists WHERE id = ${playlistId};`;
-    if (playlist.length === 0) {
-      return { success: false, error: '找不到指定的播放清單' };
-    }
+    const mismatch = await rejectAssetsOutsidePlaylist(playlistId, items.map(item => item.asset_id));
+    if (mismatch) return { success: false, error: mismatch };
     await sql`DELETE FROM signage_playlist_items WHERE playlist_id = ${playlistId};`;
     for (const item of items) {
       await sql`
@@ -1065,6 +1100,11 @@ export async function batchAppendItemsToPlaylists(
     const targetIds = playlistIds.filter(id => validIds.has(id));
     if (targetIds.length === 0) {
       return { success: false, error: '找不到任何指定的播放清單' };
+    }
+    const assetIds = items.map(item => item.asset_id);
+    for (const pid of targetIds) {
+      const mismatch = await rejectAssetsOutsidePlaylist(pid, assetIds);
+      if (mismatch) return { success: false, error: mismatch };
     }
 
     let totalInserted = 0;
@@ -1593,11 +1633,13 @@ export async function getSchedulesByScreenKey(uniqueKey: string) {
     const result = await sql`
       SELECT s.id, s.screen_id, s.playlist_id, s.start_time, s.end_time,
              s.days_of_week, s.play_date, s.start_date, s.end_date,
-             p.name AS playlist_name, sc.name AS screen_name
+             p.name AS playlist_name, p.site_id AS playlist_site_id,
+             sc.name AS screen_name, sc.site_id AS screen_site_id
       FROM signage_schedules s
       INNER JOIN signage_screens sc ON s.screen_id = sc.id
       INNER JOIN signage_playlists p ON s.playlist_id = p.id
-      WHERE sc.unique_key = ${uniqueKey};
+      WHERE sc.unique_key = ${uniqueKey}
+        AND p.site_id = sc.site_id;
     `;
     return { success: true, data: result };
   } catch (error) {
@@ -1606,16 +1648,26 @@ export async function getSchedulesByScreenKey(uniqueKey: string) {
   }
 }
 
-export async function getPlaylistItemsByPlaylistId(playlistId: number) {
+export async function getPlaylistItemsByPlaylistId(playlistId: number, siteId?: number) {
   try {
-    const result = await sql`
-      SELECT pi.id, pi.playlist_id, pi.asset_id, pi.duration_seconds, pi."order",
-             a.filename, a.blob_url, a.description
-      FROM signage_playlist_items pi
-      INNER JOIN signage_assets a ON pi.asset_id = a.id
-      WHERE pi.playlist_id = ${playlistId}
-      ORDER BY pi."order" ASC;
-    `;
+    const result = siteId
+      ? await sql`
+          SELECT pi.id, pi.playlist_id, pi.asset_id, pi.duration_seconds, pi."order",
+                 a.filename, a.blob_url, a.description, a.site_id
+          FROM signage_playlist_items pi
+          INNER JOIN signage_assets a ON pi.asset_id = a.id
+          WHERE pi.playlist_id = ${playlistId}
+            AND a.site_id = ${siteId}
+          ORDER BY pi."order" ASC;
+        `
+      : await sql`
+          SELECT pi.id, pi.playlist_id, pi.asset_id, pi.duration_seconds, pi."order",
+                 a.filename, a.blob_url, a.description, a.site_id
+          FROM signage_playlist_items pi
+          INNER JOIN signage_assets a ON pi.asset_id = a.id
+          WHERE pi.playlist_id = ${playlistId}
+          ORDER BY pi."order" ASC;
+        `;
     return { success: true, data: result };
   } catch (error) {
     console.error('取得播放清單項目時發生錯誤：', error);
@@ -1637,6 +1689,8 @@ export interface ScheduleInput {
 export async function createSchedule(data: ScheduleInput) {
   try {
     await ensureScheduleDateColumns();
+    const mismatch = await rejectPlaylistOutsideScreen(data.screen_id, data.playlist_id);
+    if (mismatch) return { success: false, error: mismatch };
     const daysJson = JSON.stringify(data.days_of_week);
     const result = await sql`
       INSERT INTO signage_schedules (screen_id, playlist_id, start_time, end_time, days_of_week, play_date, start_date, end_date)
@@ -1654,10 +1708,16 @@ export async function createSchedule(data: ScheduleInput) {
 export async function updateSchedule(id: number, data: Partial<ScheduleInput>) {
   try {
     await ensureScheduleDateColumns();
-    const existing = await sql`SELECT id FROM signage_schedules WHERE id = ${id};`;
+    const existing = await sql`
+      SELECT id, screen_id, playlist_id FROM signage_schedules WHERE id = ${id};
+    ` as Array<{ id: number; screen_id: number; playlist_id: number }>;
     if (existing.length === 0) {
       return { success: false, error: '找不到指定的排程' };
     }
+    const screenId = data.screen_id ?? existing[0].screen_id;
+    const playlistId = data.playlist_id ?? existing[0].playlist_id;
+    const mismatch = await rejectPlaylistOutsideScreen(screenId, playlistId);
+    if (mismatch) return { success: false, error: mismatch };
     const daysJson = data.days_of_week ? JSON.stringify(data.days_of_week) : null;
     const result = await sql`
       UPDATE signage_schedules SET
@@ -1779,6 +1839,8 @@ export async function batchCreateSchedules(data: {
     if (!data.screen_ids || data.screen_ids.length === 0) {
       return { success: false, error: '未提供要套用的螢幕' };
     }
+    const mismatch = await rejectPlaylistOutsideScreens(data.screen_ids, data.playlist_id);
+    if (mismatch) return { success: false, error: mismatch };
     const daysJson = JSON.stringify(data.days_of_week);
     const created: unknown[] = [];
     for (const screenId of data.screen_ids) {

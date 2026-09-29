@@ -32,10 +32,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if (result.success) {
       return NextResponse.json({ success: true, data: result.data, message: '播放清單已更新' });
     }
-    return NextResponse.json({
-      success: false,
-      message: typeof result.error === 'string' ? result.error : '更新失敗',
-    }, { status: 500 });
+    const message = typeof result.error === 'string' ? result.error : '更新失敗';
+    return NextResponse.json({ success: false, message }, { status: typeof result.error === 'string' ? 400 : 500 });
   } catch (error) {
     console.error('播放清單項目 API 錯誤：', error);
     return NextResponse.json({ success: false, message: '伺服器內部錯誤' }, { status: 500 });

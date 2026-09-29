@@ -40,10 +40,8 @@ export async function POST(req: NextRequest) {
         message: `已套用排程到 ${data.length} 個螢幕`,
       }, { status: 201 });
     }
-    return NextResponse.json({
-      success: false,
-      message: typeof result.error === 'string' ? result.error : '批次建立失敗',
-    }, { status: 500 });
+    const message = typeof result.error === 'string' ? result.error : '批次建立失敗';
+    return NextResponse.json({ success: false, message }, { status: typeof result.error === 'string' ? 400 : 500 });
   } catch (error) {
     console.error('批次排程 API 錯誤：', error);
     return NextResponse.json({ success: false, message: '伺服器內部錯誤' }, { status: 500 });
