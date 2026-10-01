@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAssetById } from '@/lib/signage/db';
+import { getAssetById, getScreenByKey } from '@/lib/signage/db';
 import { createSignageCached } from '@/lib/signage/cache';
 import { contentTypeForFilename, isImageFilename, sniffImageContentType } from '@/lib/signage/mediaType';
 
@@ -7,16 +7,35 @@ import { contentTypeForFilename, isImageFilename, sniffImageContentType } from '
  * 素材的 blob 位址：走 Data Cache，寫入素材時自動失效。
  * 這支路由在播放熱路徑上（每個 iframe 載入都會打），原本每次都查一次 DB。
  * 回傳 null 代表確實查無此素材（穩定結果可快取）；連線失敗則丟出錯誤不快取。
+ * 鍵名帶 v2：舊快取沒有 site_id，沿用會把每一支素材都判成別廠。
  */
-const loadAssetMeta = createSignageCached('asset-meta', async (id: string) => {
+const loadAssetMeta = createSignageCached('asset-meta-v2', async (id: string) => {
   const result = await getAssetById(Number(id));
   if (result.success && result.data) {
-    const row = result.data as unknown as { blob_url: string; filename: string };
-    return { blob_url: row.blob_url, filename: row.filename };
+    const row = result.data as unknown as { blob_url: string; filename: string; site_id: number | null };
+    return { blob_url: row.blob_url, filename: row.filename, site_id: row.site_id == null ? null : Number(row.site_id) };
   }
   if (result.error === '找不到指定的素材') return null;
   throw new Error('讀取素材失敗');
 });
+
+/** 螢幕所屬廠區：同樣走 Data Cache，任何寫入都會失效。 */
+const loadScreenSite = createSignageCached('screen-site', async (key: string) => {
+  const result = await getScreenByKey(key);
+  if (result.success && result.data) {
+    const row = result.data as unknown as { site_id: number };
+    return { site_id: Number(row.site_id) };
+  }
+  if (result.error === '找不到指定的螢幕') return null;
+  throw new Error('讀取螢幕失敗');
+});
+
+const FORBIDDEN_HEADERS = {
+  'Cache-Control': 'private, no-store, no-cache, must-revalidate',
+  Pragma: 'no-cache',
+  'CDN-Cache-Control': 'no-store',
+  'Vercel-CDN-Cache-Control': 'no-store',
+} as const;
 
 function injectReadyHandshakeScript(html: string): string {
   const prelude = `
@@ -154,6 +173,20 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     const asset = await loadAssetMeta(String(id));
     if (!asset) {
       return new NextResponse('Asset not found', { status: 404 });
+    }
+
+    // 播放端的素材網址都帶 sk=螢幕代碼。素材必須屬於這台螢幕的廠區才送出，
+    // 否則就算遠端留著舊程式、舊清單或舊快取，也拿不到別廠的畫面。
+    // 後台預覽沒有 sk，不受此限制。
+    const screenKey = req.nextUrl.searchParams.get('sk');
+    if (screenKey) {
+      const screen = await loadScreenSite(screenKey);
+      if (!screen) {
+        return new NextResponse('Screen not found', { status: 404, headers: FORBIDDEN_HEADERS });
+      }
+      if (asset.site_id == null || asset.site_id !== screen.site_id) {
+        return new NextResponse('Asset does not belong to this screen', { status: 403, headers: FORBIDDEN_HEADERS });
+      }
     }
 
     const blobRes = await fetch(asset.blob_url);
