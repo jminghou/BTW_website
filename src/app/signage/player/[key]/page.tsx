@@ -336,9 +336,9 @@ export default function PlayerPage() {
         <div className="text-6xl mb-4">📺</div>
         <div className="text-2xl mb-2">{data?.status === 'error' ? '系統錯誤' : '待機中'}</div>
         <div className="text-sm opacity-60">{data?.message ?? '目前沒有排程內容'}</div>
-        {data?.screen_name && (
-          <div className="absolute bottom-4 right-4 text-xs opacity-40">{data.screen_name}</div>
-        )}
+        <div className="absolute bottom-4 right-4 text-xs opacity-40">
+          {data?.screen_name ?? '…'} · {key?.substring(0, 8)}
+        </div>
       </div>
     );
   }
@@ -369,6 +369,11 @@ export default function PlayerPage() {
           onReady={pendingSlot === 'b' ? startTransition : undefined}
         />
       )}
+
+      {/* 監測標籤：螢幕名稱 + 網址代碼前 8 碼 + 目前檔名。代碼來自網址，名稱來自伺服器，兩者對不上就表示頁面被導到別台。 */}
+      <div className="absolute bottom-2 right-2 z-[99999] bg-black/70 text-white text-[11px] px-2 py-1 rounded pointer-events-none max-w-[80vw] truncate">
+        {data?.screen_name ?? '…'} · {key?.substring(0, 8)} · {active?.filename ?? '載入中'} · {currentIdx + 1}/{items.length}
+      </div>
 
       {showStatus && (
         <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-3 py-2 rounded-lg space-y-1 max-w-xs">
