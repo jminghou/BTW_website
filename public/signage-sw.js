@@ -10,6 +10,7 @@
  *       不寫進 Cache Storage，避免離線時拿別台螢幕的 JSON 來頂替。
  *       也不要對這支請求下 cache: 'no-store'，否則 CDN 的 s-maxage 可能被跳過。
  *   - 播放頁面導覽：network-first（線上最新、離線時退回上次頁面）
+ *   - 售完 GET（/api/signage/soldout）：不進本機快取，交給 CDN 依 ?key= 快取。
  *   - 版本化素材 HTML（/api/signage/asset/）與共用資源（/signage-assets/）：cache-first
  *   - 素材頁面內的外部圖片/字型/樣式/腳本：cache-first
  *   - 其餘請求不介入
@@ -119,9 +120,13 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 售完狀態必須每次打到伺服器，絕不可快取
+  // 售完 GET：不進本機 Cache Storage。CDN 依 ?key= 快取，不同菜單不會混用。
   if (sameOrigin && url.pathname === '/api/signage/soldout') {
-    event.respondWith(networkOnly(req));
+    event.respondWith(fetch(req.url, {
+      method: 'GET',
+      credentials: 'same-origin',
+      cache: 'default',
+    }));
     return;
   }
 
@@ -148,10 +153,6 @@ self.addEventListener('fetch', (event) => {
   }
   // 其餘不介入
 });
-
-async function networkOnly(req) {
-  return fetch(req, { cache: 'no-store' });
-}
 
 async function cacheFirst(req) {
   const cache = await caches.open(CACHE);

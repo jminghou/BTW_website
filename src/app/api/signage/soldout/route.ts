@@ -12,9 +12,22 @@ const MAX_KEY_LEN = 200;
 const MAX_ITEMS = 40;
 const MAX_NAME_LEN = 120;
 
-/** 瀏覽器／CDN 不快取；伺服器端 Data Cache 另走 cachedSoldOutRead。 */
+/** 瀏覽器不快取。錯誤回應另外標 no-store，避免 CDN 記住失敗。 */
 const NO_STORE = {
   'Cache-Control': 'no-store, max-age=0, must-revalidate',
+  'CDN-Cache-Control': 'no-store',
+  'Vercel-CDN-Cache-Control': 'no-store',
+};
+
+/**
+ * 同一個 ?key= 在 30 秒內由 CDN 回覆，不啟動函式。
+ * 不設 stale-while-revalidate，跨裝置售完延遲上限就是這 30 秒。
+ * 本機雙擊仍立刻改畫面；這只影響其他裝置同步。
+ */
+const CDN_30 = {
+  'Cache-Control': 'public, max-age=0, must-revalidate',
+  'CDN-Cache-Control': 'public, s-maxage=30',
+  'Vercel-CDN-Cache-Control': 'public, s-maxage=30',
 };
 
 function normalizeKey(raw: unknown): string | null {
@@ -39,7 +52,8 @@ function normalizeItems(raw: unknown): string[] | null {
 
 /**
  * 菜單售完狀態（跨裝置同步）
- * 平常 GET 命中 Data Cache，不打 DB；POST／PUT 寫入後才失效快取。
+ * 平常 GET 由 CDN 快取 30 秒，過期後才進函式；函式內再命中 Data Cache，不打 DB。
+ * POST／PUT 寫入後失效 Data Cache。CDN 最慢 30 秒內仍可能回舊的 GET。
  * GET  /api/signage/soldout?key=asset:123
  * POST /api/signage/soldout  body: { key, items: string[] }
  */
@@ -56,7 +70,7 @@ export async function GET(req: NextRequest) {
       return read.data;
     });
 
-    return NextResponse.json({ success: true, data }, { headers: NO_STORE });
+    return NextResponse.json({ success: true, data }, { headers: CDN_30 });
   } catch (error) {
     console.error('售完狀態 GET 錯誤：', error);
     return NextResponse.json({ success: false, message: '伺服器內部錯誤' }, { status: 500, headers: NO_STORE });
