@@ -2,6 +2,7 @@ import { neon } from '@neondatabase/serverless';
 import { randomUUID } from 'crypto';
 import { revalidateSignage } from './cache';
 import { isImageFilename } from './mediaType';
+import type { ScheduleRow } from './schedule';
 
 /**
  * 數位看版系統資料庫工具
@@ -1645,6 +1646,140 @@ export async function getSchedulesByScreenKey(uniqueKey: string) {
   } catch (error) {
     console.error('取得排程時發生錯誤：', error);
     return { success: false, error };
+  }
+}
+
+export interface PlayerBundleItem {
+  asset_id: number;
+  site_id: number | null;
+  filename: string;
+  blob_url: string;
+  duration_seconds: number;
+  description: string | null;
+}
+
+export type PlayerBundleSchedule = ScheduleRow & {
+  playlist_site_id?: number;
+  items: PlayerBundleItem[];
+};
+
+export interface PlayerBundle {
+  screen: {
+    id: number;
+    site_id: number;
+    name: string;
+    unique_key: string;
+  };
+  schedules: PlayerBundleSchedule[];
+}
+
+interface PlayerBundleQueryRow {
+  screen_id: number;
+  screen_site_id: number;
+  screen_name: string;
+  unique_key: string;
+  schedule_id: number | null;
+  playlist_id: number | null;
+  start_time: ScheduleRow['start_time'] | null;
+  end_time: ScheduleRow['end_time'] | null;
+  days_of_week: string | null;
+  play_date: ScheduleRow['play_date'];
+  start_date: ScheduleRow['start_date'];
+  end_date: ScheduleRow['end_date'];
+  playlist_name: string | null;
+  playlist_site_id: number | null;
+  asset_id: number | null;
+  duration_seconds: number | null;
+  filename: string | null;
+  blob_url: string | null;
+  description: string | null;
+  asset_site_id: number | null;
+}
+
+/**
+ * 播放器熱路徑專用：螢幕、排程、清單素材一次 JOIN。
+ * 別廠清單與別廠素材在 JOIN 條件就排除，結果與原本
+ * 「先查螢幕、再查排程、再依清單查素材」相同，只少兩趟網路往返。
+ * 換餐仍由呼叫端用當下時間做 matchSchedules，這裡不快取配對結果。
+ */
+export async function getPlayerBundleByScreenKey(uniqueKey: string) {
+  try {
+    await ensureScheduleDateColumns();
+    const rows = await sql`
+      SELECT sc.id AS screen_id, sc.site_id AS screen_site_id, sc.name AS screen_name, sc.unique_key,
+             s.id AS schedule_id, s.playlist_id, s.start_time, s.end_time,
+             s.days_of_week, s.play_date, s.start_date, s.end_date,
+             p.name AS playlist_name, p.site_id AS playlist_site_id,
+             pi.asset_id, pi.duration_seconds,
+             a.filename, a.blob_url, a.description, a.site_id AS asset_site_id
+      FROM signage_screens sc
+      LEFT JOIN signage_schedules s ON s.screen_id = sc.id
+      LEFT JOIN signage_playlists p
+        ON p.id = s.playlist_id AND p.site_id = sc.site_id
+      LEFT JOIN signage_playlist_items pi ON pi.playlist_id = p.id
+      LEFT JOIN signage_assets a
+        ON a.id = pi.asset_id AND a.site_id = sc.site_id
+      WHERE sc.unique_key = ${uniqueKey}
+      ORDER BY s.id ASC, pi."order" ASC, pi.id ASC;
+    ` as PlayerBundleQueryRow[];
+
+    if (rows.length === 0) {
+      return { success: true as const, data: null };
+    }
+
+    const screen = {
+      id: Number(rows[0].screen_id),
+      site_id: Number(rows[0].screen_site_id),
+      name: rows[0].screen_name,
+      unique_key: rows[0].unique_key,
+    };
+    const schedules = new Map<number, PlayerBundleSchedule>();
+
+    for (const row of rows) {
+      // 別廠或已刪除的清單：playlist JOIN 落空。與原本 INNER JOIN 一樣不納入。
+      if (row.schedule_id == null || row.playlist_id == null || row.playlist_site_id == null) continue;
+      if (row.start_time == null || row.end_time == null || row.days_of_week == null) continue;
+
+      const scheduleId = Number(row.schedule_id);
+      let schedule = schedules.get(scheduleId);
+      if (!schedule) {
+        schedule = {
+          id: scheduleId,
+          screen_id: screen.id,
+          playlist_id: Number(row.playlist_id),
+          start_time: row.start_time,
+          end_time: row.end_time,
+          days_of_week: row.days_of_week,
+          play_date: row.play_date,
+          start_date: row.start_date,
+          end_date: row.end_date,
+          playlist_name: row.playlist_name ?? undefined,
+          playlist_site_id: Number(row.playlist_site_id),
+          items: [],
+        };
+        schedules.set(scheduleId, schedule);
+      }
+
+      // 素材不存在或不是這個廠區：asset JOIN 落空，略過該筆（與原本 INNER JOIN 相同）。
+      if (row.asset_id == null || !row.filename || !row.blob_url) continue;
+      if (row.asset_site_id == null || Number(row.asset_site_id) !== screen.site_id) continue;
+      schedule.items.push({
+        asset_id: Number(row.asset_id),
+        site_id: Number(row.asset_site_id),
+        filename: row.filename,
+        blob_url: row.blob_url,
+        duration_seconds: Number(row.duration_seconds ?? 10),
+        description: row.description,
+      });
+    }
+
+    return {
+      success: true as const,
+      data: { screen, schedules: Array.from(schedules.values()) } satisfies PlayerBundle,
+    };
+  } catch (error) {
+    console.error('取得播放內容時發生錯誤：', error);
+    return { success: false as const, error };
   }
 }
 

@@ -1,36 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import {
-  getScreenByKey,
-  getSchedulesByScreenKey,
-  getPlaylistItemsByPlaylistId,
-} from '@/lib/signage/db';
-import { matchSchedules, type ScheduleRow } from '@/lib/signage/schedule';
+import { getPlayerBundleByScreenKey } from '@/lib/signage/db';
+import { matchSchedules } from '@/lib/signage/schedule';
 import { assetProxyUrl } from '@/lib/signage/assetVersion';
 import { signageMediaKind } from '@/lib/signage/mediaType';
 
 /**
- * 播放器排程必須每次打 DB，不可走 Data Cache。
- * 先前快取鍵在正式環境會把不同螢幕的清單撞在一起，
- * 同一支網址在 A 電腦播櫃台菜單、B 電腦播到用餐區菲律賓餐。
+ * 配對結果不可放進永不過期的 Data Cache：換餐只看台灣時間，不會寫資料庫。
+ * 每次回源仍查 DB，但螢幕、排程、清單合成一趟 JOIN。
+ * 先前 Data Cache 鍵在正式環境會把不同螢幕的清單撞在一起。
  */
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
-
-interface ScreenRow {
-  id: number;
-  site_id: number;
-  name: string;
-  unique_key: string;
-}
-
-interface RawPlaylistItem {
-  asset_id: number;
-  site_id: number | null;
-  filename: string;
-  blob_url: string;
-  duration_seconds: number;
-  description: string | null;
-}
 
 const NO_STORE = {
   'Cache-Control': 'private, no-store, no-cache, must-revalidate',
@@ -53,14 +33,15 @@ export async function GET(
   }
 
   try {
-    const screenResult = await getScreenByKey(key);
-    if (!screenResult.success || !screenResult.data) {
+    const bundleResult = await getPlayerBundleByScreenKey(key);
+    if (!bundleResult.success) throw new Error('取得播放內容失敗');
+    if (!bundleResult.data) {
       return NextResponse.json({
         status: 'error',
         message: '找不到對應的螢幕',
       }, { status: 404, headers: NO_STORE });
     }
-    const screen = screenResult.data as unknown as ScreenRow;
+    const { screen, schedules: bundleSchedules } = bundleResult.data;
     if (screen.unique_key && screen.unique_key !== key) {
       return NextResponse.json({
         status: 'error',
@@ -68,12 +49,11 @@ export async function GET(
       }, { status: 409, headers: NO_STORE });
     }
 
-    const scheduleResult = await getSchedulesByScreenKey(key);
-    if (!scheduleResult.success) throw new Error('取得排程失敗');
     const siteId = Number(screen.site_id);
     // 只播這台螢幕所屬廠區的清單與素材。別廠的排程、空清單同名補檔都不會進來。
-    const schedules = ((scheduleResult.data as unknown as (ScheduleRow & { playlist_site_id?: number })[]) ?? [])
-      .filter(s => s.screen_id === screen.id && Number(s.playlist_site_id) === siteId);
+    const schedules = bundleSchedules.filter(
+      s => s.screen_id === screen.id && Number(s.playlist_site_id) === siteId,
+    );
 
     const matched = matchSchedules(schedules);
     if (matched.length === 0) {
@@ -87,14 +67,13 @@ export async function GET(
       }, { headers: NO_STORE });
     }
 
-    const itemLists = await Promise.all(matched.map(async (schedule) => {
-      const result = await getPlaylistItemsByPlaylistId(schedule.playlist_id, siteId);
-      if (!result.success) throw new Error('取得播放清單項目失敗');
-      const rows = ((result.data as unknown as RawPlaylistItem[]) ?? [])
-        .filter(row => Number(row.site_id) === siteId);
-      return { schedule, rows };
-    }));
-    const withItems = itemLists.filter(entry => entry.rows.length > 0);
+    const itemsByScheduleId = new Map(bundleSchedules.map(s => [s.id, s.items]));
+    const withItems = matched
+      .map(schedule => ({
+        schedule,
+        rows: (itemsByScheduleId.get(schedule.id) ?? []).filter(row => Number(row.site_id) === siteId),
+      }))
+      .filter(entry => entry.rows.length > 0);
     const rawItems = withItems.flatMap(entry => entry.rows);
 
     if (rawItems.length === 0) {
