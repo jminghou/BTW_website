@@ -1,0 +1,10 @@
+{
+  "functions": {
+    "src/app/api/signage/player/**": {
+      "memory": 512
+    },
+    "src/app/api/signage/soldout/route.ts": {
+      "memory": 512
+    }
+  }
+}
