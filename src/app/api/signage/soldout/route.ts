@@ -5,6 +5,8 @@ import { getSoldOutDishes, setSoldOutDishes } from '@/lib/signage/db';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+/** 命中 Data Cache 時約十幾毫秒。避免連線卡住時長時間計費。 */
+export const maxDuration = 5;
 
 const MAX_KEY_LEN = 200;
 const MAX_ITEMS = 40;

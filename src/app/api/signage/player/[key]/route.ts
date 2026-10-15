@@ -11,6 +11,8 @@ import { signageMediaKind } from '@/lib/signage/mediaType';
  */
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+/** 正常一趟查詢遠低於此。避免連線卡住時按配置記憶體一直計費。 */
+export const maxDuration = 10;
 
 const NO_STORE = {
   'Cache-Control': 'private, no-store, no-cache, must-revalidate',
