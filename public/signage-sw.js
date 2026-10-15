@@ -6,8 +6,10 @@
  *       線上時只有素材編輯（?v= 版本碼變）才會重新下載那一支。
  *
  * 策略：
- *   - 排程 JSON（/api/signage/player/）與播放頁面導覽：network-first
- *       （線上永遠取最新排程；離線時退回上次快取，避免斷網跳待機）
+ *   - 排程 JSON（/api/signage/player/）：交給網路與 Vercel CDN。
+ *       不寫進 Cache Storage，避免離線時拿別台螢幕的 JSON 來頂替。
+ *       也不要對這支請求下 cache: 'no-store'，否則 CDN 的 s-maxage 可能被跳過。
+ *   - 播放頁面導覽：network-first（線上最新、離線時退回上次頁面）
  *   - 版本化素材 HTML（/api/signage/asset/）與共用資源（/signage-assets/）：cache-first
  *   - 素材頁面內的外部圖片/字型/樣式/腳本：cache-first
  *   - 其餘請求不介入
@@ -101,9 +103,13 @@ self.addEventListener('fetch', (event) => {
   // Next.js 打包檔必須走網路，避免舊 SW 把過期的播放器程式鎖住
   if (sameOrigin && url.pathname.startsWith('/_next/')) return;
 
-  // 排程 JSON：只走網路，絕不拿別台螢幕快取下來的 JSON 頂替
+  // 排程 JSON：不進本機 Cache Storage。CDN 依網址（含 screen key）快取。
   if (sameOrigin && url.pathname.startsWith('/api/signage/player/')) {
-    event.respondWith(networkOnly(req));
+    event.respondWith(fetch(req.url, {
+      method: 'GET',
+      credentials: 'same-origin',
+      cache: 'default',
+    }));
     return;
   }
 

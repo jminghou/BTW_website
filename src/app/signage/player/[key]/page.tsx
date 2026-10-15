@@ -119,8 +119,7 @@ export default function PlayerPage() {
     const gen = ++fetchGenRef.current;
     try {
       const res = await fetch(
-        `/api/signage/player/${encodeURIComponent(requestKey)}?t=${Date.now()}`,
-        { cache: 'no-store' },
+        `/api/signage/player/${encodeURIComponent(requestKey)}`,
       );
       const json: PlayerResponse = await res.json();
       if (gen !== fetchGenRef.current) return;

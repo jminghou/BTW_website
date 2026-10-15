@@ -6,7 +6,8 @@ import { signageMediaKind } from '@/lib/signage/mediaType';
 
 /**
  * 配對結果不可放進永不過期的 Data Cache：換餐只看台灣時間，不會寫資料庫。
- * 每次回源仍查 DB，但螢幕、排程、清單合成一趟 JOIN。
+ * 每次回源仍查 DB（一趟 JOIN）。CDN 以路徑裡的 screen key 快取 60 秒，
+ * 不同看板不會互拿內容。不設 stale-while-revalidate，避免換餐延遲超過 60 秒。
  * 先前 Data Cache 鍵在正式環境會把不同螢幕的清單撞在一起。
  */
 export const dynamic = 'force-dynamic';
@@ -19,6 +20,13 @@ const NO_STORE = {
   Pragma: 'no-cache',
   'CDN-Cache-Control': 'no-store',
   'Vercel-CDN-Cache-Control': 'no-store',
+} as const;
+
+/** 瀏覽器每次都問 CDN；同一個 screen key 在 60 秒內不回源。 */
+const CDN_60 = {
+  'Cache-Control': 'public, max-age=0, must-revalidate',
+  'CDN-Cache-Control': 'public, s-maxage=60',
+  'Vercel-CDN-Cache-Control': 'public, s-maxage=60',
 } as const;
 
 export async function GET(
@@ -66,7 +74,7 @@ export async function GET(
         screen_key: key,
         screen_name: screen.name,
         current_time: new Date().toISOString(),
-      }, { headers: NO_STORE });
+      }, { headers: CDN_60 });
     }
 
     const itemsByScheduleId = new Map(bundleSchedules.map(s => [s.id, s.items]));
@@ -86,7 +94,7 @@ export async function GET(
         screen_key: key,
         screen_name: screen.name,
         current_time: new Date().toISOString(),
-      }, { headers: NO_STORE });
+      }, { headers: CDN_60 });
     }
 
     const items = rawItems.map(it => ({
@@ -106,7 +114,7 @@ export async function GET(
       screen_key: key,
       screen_name: screen.name,
       current_time: new Date().toISOString(),
-    }, { headers: NO_STORE });
+    }, { headers: CDN_60 });
   } catch (error) {
     console.error('播放器 API 錯誤：', error);
     return NextResponse.json({
