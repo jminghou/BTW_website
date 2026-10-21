@@ -22,15 +22,31 @@ function getErrorMessage(error: unknown) {
   return String(error);
 }
 
+const HEARD_FROM_OPTIONS = ['社群平台', 'Google 搜尋', '新聞報導', '親友介紹', '其他'] as const;
+
+function normalizeHeardFrom(value: unknown, otherText: unknown): string | null {
+  if (value == null || value === '') return '';
+  if (!Array.isArray(value)) return null;
+  const allowed = new Set<string>(HEARD_FROM_OPTIONS);
+  if (value.some(item => typeof item !== 'string' || !allowed.has(item))) return null;
+  const selected = HEARD_FROM_OPTIONS.filter(option => value.includes(option));
+  const other = typeof otherText === 'string' ? otherText.trim().slice(0, 200) : '';
+  if (other && !selected.includes('其他')) return null;
+  return selected
+    .map(option => (option === '其他' && other ? `其他：${other}` : option))
+    .join('、');
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { identity, user_name, title, user_email, phone, message } = body;
+    const { identity, user_name, title, user_email, phone, message, heard_from, heard_from_other } = body;
+    const heardFromText = normalizeHeardFrom(heard_from, heard_from_other);
 
-    if (!identity || !user_name || !title || !user_email || !message) {
+    if (!identity || !user_name || !title || !user_email || !message || heardFromText === null) {
       return NextResponse.json({
         success: false,
-        message: '請填寫所有必填欄位'
+        message: heardFromText === null ? '請選擇有效的得知管道' : '請填寫所有必填欄位'
       }, { status: 400 });
     }
 
@@ -40,7 +56,8 @@ export async function POST(request: NextRequest) {
       title,
       user_email,
       phone,
-      message
+      message,
+      heard_from: heardFromText,
     });
 
     if (result.success) {
@@ -59,6 +76,7 @@ export async function POST(request: NextRequest) {
           const safeTitle = escapeHtml(String(title));
           const safeEmail = escapeHtml(String(user_email));
           const safePhone = escapeHtml(String(phone || '未提供'));
+          const safeHeardFrom = escapeHtml(heardFromText || '未提供');
           const safeMessage = escapeHtml(String(message));
 
           await sendMicrosoftMail({
@@ -89,6 +107,10 @@ export async function POST(request: NextRequest) {
                   <tr>
                     <td style="padding: 10px; background-color: #f9f9f9; font-weight: bold;">電話</td>
                     <td style="padding: 10px; border-bottom: 1px solid #eee;">${safePhone}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 10px; background-color: #f9f9f9; font-weight: bold;">從何得知</td>
+                    <td style="padding: 10px; border-bottom: 1px solid #eee;">${safeHeardFrom}</td>
                   </tr>
                   <tr>
                     <td style="padding: 10px; background-color: #f9f9f9; font-weight: bold; vertical-align: top;">訊息內容</td>

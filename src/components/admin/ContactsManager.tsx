@@ -10,6 +10,7 @@ interface Contact {
   user_email: string;
   phone: string;
   message: string;
+  heard_from?: string | null;
   created_at: string;
   email_status?: 'sent' | 'failed' | null;
   email_error?: string | null;
@@ -72,7 +73,7 @@ export default function ContactsManager() {
   const exportToCSV = () => {
     if (filteredContacts.length === 0) return;
 
-    const headers = ['ID', '身份', '姓名', '主旨', '電子信箱', '電話', '訊息', '提交時間', '寄信狀態', '寄信錯誤'];
+    const headers = ['ID', '身份', '姓名', '主旨', '電子信箱', '電話', '從何得知浩華', '訊息', '提交時間', '寄信狀態', '寄信錯誤'];
     const csvContent = [
       headers.join(','),
       ...filteredContacts.map(contact => [
@@ -82,6 +83,7 @@ export default function ContactsManager() {
         `"${contact.title}"`,
         contact.user_email,
         contact.phone || '',
+        `"${(contact.heard_from || '').replace(/"/g, '""')}"`,
         `"${contact.message.replace(/"/g, '""')}"`,
         new Date(contact.created_at).toLocaleString('zh-TW'),
         contact.email_status === 'sent' ? '已寄出' : contact.email_status === 'failed' ? '未寄出' : '未知',
@@ -112,7 +114,8 @@ export default function ContactsManager() {
       contact.user_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       contact.user_email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       contact.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      contact.message.toLowerCase().includes(searchTerm.toLowerCase());
+      contact.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (contact.heard_from || '').toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesFilter = filterIdentity === 'all' || contact.identity === filterIdentity;
     const matchesEmailStatus =
@@ -315,6 +318,9 @@ export default function ContactsManager() {
                               <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
                                 {contact.identity}
                               </span>
+                              {contact.heard_from ? (
+                                <div className="mt-1">從何得知：{contact.heard_from}</div>
+                              ) : null}
                             </div>
                           </div>
                         </td>
