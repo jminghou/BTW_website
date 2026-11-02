@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { deleteAssetBlob, uploadAsset } from '@/lib/signage/storage';
 import { getSites, upsertAssetByFilename } from '@/lib/signage/db';
 import { templates, DEFAULT_TEMPLATE, type MealItem, type ConvertedMenu } from '@/lib/signage/templates';
+import { filterExcludedSignageMeals } from '@/lib/signage/excludedRestaurants';
 
 /** 一次最多同時進行的上傳數，避免一次打爆 Blob / Neon 連線 */
 const UPLOAD_CONCURRENCY = 8;
@@ -86,7 +87,12 @@ export async function POST(req: NextRequest) {
       }
 
       try {
-        for (const menu of template.convert(meals)) {
+        const visibleMeals = Array.isArray(meals) ? filterExcludedSignageMeals(meals) : meals;
+        if (Array.isArray(meals) && meals.length > 0 && visibleMeals.length === 0) {
+          failed.push({ filename: file.name, error: '沒有可輸出的餐點（長宏人力不會出現在電子看版）' });
+          continue;
+        }
+        for (const menu of template.convert(visibleMeals)) {
           tasks.push({ menu, sourceName: file.name });
         }
       } catch (err) {

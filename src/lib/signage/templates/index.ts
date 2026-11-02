@@ -32,6 +32,7 @@ import { convertB2RichtekDrinkTv } from './b2_richtek_drink';
 import { convertB2IlitekDinnerTv } from './b2_ilitek_dinner';
 import { convertBwecZubTv } from './bwec_zub';
 import { convertVisAdDay2Tv } from './vis_ad_day2';
+import { filterExcludedSignageMeals } from '../excludedRestaurants';
 
 /**
  * 版型註冊表（電子看板「上傳 JSON 自動轉檔」用）
@@ -295,6 +296,12 @@ export const templates: Record<string, SignageTemplate> = {
     convert: convertVisAdDay2Tv,
   },
 };
+
+for (const template of Object.values(templates)) {
+  const convert = template.convert;
+  template.convert = (meals) =>
+    convert(Array.isArray(meals) ? filterExcludedSignageMeals(meals) : meals);
+}
 
 export const DEFAULT_TEMPLATE = 'vis_tv';
 
