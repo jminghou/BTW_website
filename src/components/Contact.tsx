@@ -1,18 +1,24 @@
 "use client";
 
-import { useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+
+const HEARD_FROM_OPTIONS = ['社群平台', 'Google 搜尋', '新聞報導', '親友介紹', '其他'] as const;
 
 const Contact = () => {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
+  const heardFromRef = useRef<HTMLDivElement>(null);
+  const [heardFromOpen, setHeardFromOpen] = useState(false);
   const [formData, setFormData] = useState({
     identity: '',
     user_name: '',
     title: '',
     user_email: '',
     phone: '',
-    message: ''
+    message: '',
+    heard_from: [] as string[],
+    heard_from_other: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<{success?: boolean; message?: string} | null>(null);
@@ -25,6 +31,27 @@ const Contact = () => {
   const handleRadioChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({ ...prev, identity: e.target.value }));
   };
+
+  const handleHeardFromChange = (option: string, checked: boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      heard_from: checked
+        ? HEARD_FROM_OPTIONS.filter(item => item === option || prev.heard_from.includes(item))
+        : prev.heard_from.filter(item => item !== option),
+      heard_from_other: !checked && option === '其他' ? '' : prev.heard_from_other,
+    }));
+  };
+
+  useEffect(() => {
+    if (!heardFromOpen) return;
+    const closeOnOutside = (event: MouseEvent) => {
+      if (!heardFromRef.current?.contains(event.target as Node)) {
+        setHeardFromOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', closeOnOutside);
+    return () => document.removeEventListener('mousedown', closeOnOutside);
+  }, [heardFromOpen]);
 
   // 根據身份代表返回對應的 placeholder 文字
   const getTitlePlaceholder = () => {
@@ -62,6 +89,28 @@ const Contact = () => {
     }
   };
 
+  const getHintTextColor = () => {
+    switch (formData.identity) {
+      case '餐飲商家':
+        return 'text-[#e03838]';
+      case '其他':
+        return 'text-gray-400';
+      default:
+        return 'text-[#00bed6]';
+    }
+  };
+
+  const getAccentColor = () => {
+    switch (formData.identity) {
+      case '餐飲商家':
+        return 'accent-[#e03838]';
+      case '其他':
+        return 'accent-gray-400';
+      default:
+        return 'accent-[#00bed6]';
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -92,8 +141,11 @@ const Contact = () => {
           title: '',
           user_email: '',
           phone: '',
-          message: ''
+          message: '',
+          heard_from: [],
+          heard_from_other: '',
         });
+        setHeardFromOpen(false);
         if (formRef.current) {
           formRef.current.reset();
         }
@@ -156,6 +208,64 @@ const Contact = () => {
                 其他
               </label>
             </div>
+          </div>
+          <div className="mb-2" ref={heardFromRef}>
+            <p className="mb-2" id="heard-from-label">從何得知浩華？（可複選）</p>
+            <div className="relative">
+              <button
+                type="button"
+                className="flex w-full items-center justify-between rounded border bg-white p-2 text-left"
+                aria-labelledby="heard-from-label"
+                aria-expanded={heardFromOpen}
+                aria-haspopup="listbox"
+                onClick={() => setHeardFromOpen(open => !open)}
+              >
+                <span className={formData.heard_from.length === 0 ? getHintTextColor() : 'text-gray-900'}>
+                  {formData.heard_from.length === 0
+                    ? '請選擇'
+                    : formData.heard_from
+                        .map(option =>
+                          option === '其他' && formData.heard_from_other.trim()
+                            ? `其他：${formData.heard_from_other.trim()}`
+                            : option,
+                        )
+                        .join('、')}
+                </span>
+                <span aria-hidden="true" className={formData.heard_from.length === 0 ? getHintTextColor() : 'text-gray-500'}>{heardFromOpen ? '▴' : '▾'}</span>
+              </button>
+              {heardFromOpen && (
+                <div
+                  className="absolute z-20 mt-1 w-full rounded border bg-white py-1 shadow"
+                  role="listbox"
+                  aria-multiselectable="true"
+                  aria-labelledby="heard-from-label"
+                >
+                  {HEARD_FROM_OPTIONS.map(option => (
+                    <label key={option} className="flex cursor-pointer items-center px-3 py-2 hover:bg-gray-50">
+                      <input
+                        type="checkbox"
+                        name="heard_from"
+                        value={option}
+                        className={`mr-2 h-4 w-4 ${getAccentColor()}`}
+                        checked={formData.heard_from.includes(option)}
+                        onChange={(e) => handleHeardFromChange(option, e.target.checked)}
+                      />
+                      {option}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+            {formData.heard_from.includes('其他') && (
+              <input
+                type="text"
+                name="heard_from_other"
+                value={formData.heard_from_other}
+                onChange={handleChange}
+                className={`mt-2 w-full rounded border p-2 ${getPlaceholderColor()}`}
+                placeholder="請說明從何處得知"
+              />
+            )}
           </div>
           <div>
             <input 

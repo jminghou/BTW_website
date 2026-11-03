@@ -50,6 +50,7 @@ export async function createTables() {
         user_email VARCHAR(255) NOT NULL,
         phone VARCHAR(20),
         message TEXT NOT NULL,
+        heard_from TEXT,
         email_status VARCHAR(20),
         email_error TEXT,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -217,6 +218,7 @@ export async function createTables() {
 async function ensureContactsEmailColumns() {
   await sql`ALTER TABLE contacts ADD COLUMN IF NOT EXISTS email_status VARCHAR(20);`;
   await sql`ALTER TABLE contacts ADD COLUMN IF NOT EXISTS email_error TEXT;`;
+  await sql`ALTER TABLE contacts ADD COLUMN IF NOT EXISTS heard_from TEXT;`;
 }
 
 // 儲存聯絡表單資料
@@ -227,13 +229,15 @@ export async function saveContact(contactData: {
   user_email: string;
   phone?: string;
   message: string;
+  heard_from?: string;
 }) {
   try {
     await ensureContactsEmailColumns();
     const result = await sql`
-      INSERT INTO contacts (identity, user_name, title, user_email, phone, message)
+      INSERT INTO contacts (identity, user_name, title, user_email, phone, message, heard_from)
       VALUES (${contactData.identity}, ${contactData.user_name}, ${contactData.title}, 
-              ${contactData.user_email}, ${contactData.phone || ''}, ${contactData.message})
+              ${contactData.user_email}, ${contactData.phone || ''}, ${contactData.message},
+              ${contactData.heard_from || ''})
       RETURNING *;
     `;
 

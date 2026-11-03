@@ -1,6 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import Image from 'next/image';
+import { useRouter } from 'next/navigation';
+import {
+  FIELD_SITE_HOME,
+  LOGIN_FACTORIES,
+  LOGIN_IDENTITIES,
+  fieldStaffHome,
+  isFieldStaff,
+  readStaffSession,
+} from '@/lib/fieldAccess';
 import InternalNavbar from '@/components/admin/InternalNavbar';
 import Dashboard from '@/components/admin/Dashboard';
 import ContactsManager from '@/components/admin/ContactsManager';
@@ -23,60 +33,38 @@ interface Contact {
 interface LoginForm {
   username: string;
   password: string;
+  loginAs: 'admin' | 'field';
+  siteId: string;
 }
 
 export default function AdminPage() {
+  const router = useRouter();
   // 驗證狀態
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [loginForm, setLoginForm] = useState<LoginForm>({ username: '', password: '' });
+  const [loginForm, setLoginForm] = useState<LoginForm>({
+    username: '',
+    password: '',
+    loginAs: 'admin',
+    siteId: '3',
+  });
   const [loginError, setLoginError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-  
-  // 資料庫初始化狀態
-  const [isInitializing, setIsInitializing] = useState(false);
-  const [initMessage, setInitMessage] = useState('');
-  const [showInitButton, setShowInitButton] = useState(true); // 預設顯示，檢查後再隱藏
+  const [fieldRedirect, setFieldRedirect] = useState(false);
+  const [sessionChecked, setSessionChecked] = useState(false);
 
-  // 清理不再需要的狀態，現在由各組件管理自己的狀態
-
-  // 檢查資料庫狀態
   useEffect(() => {
-    const checkDatabaseStatus = async () => {
-      try {
-        const response = await fetch('/api/auth', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            username: 'test',
-            password: 'test'
-          })
-        });
-        
-        const result = await response.json();
-        
-        // 如果資料庫正常且有使用者存在，隱藏初始化按鈕
-        if (result.success) {
-          setShowInitButton(false);
-        } else if (result.needsInit || 
-            result.message?.includes('relation "users" does not exist') || 
-            result.message?.includes('帳號不存在') ||
-            result.message?.includes('資料庫表格不存在')) {
-          setShowInitButton(true);
-        } else {
-          // 其他錯誤情況（如密碼錯誤）可能表示資料庫正常，隱藏初始化按鈕
-          setShowInitButton(false);
-        }
-      } catch (error) {
-        console.log('資料庫狀態檢查失敗:', error);
-        // 如果連接失敗，也顯示初始化按鈕
-        setShowInitButton(true);
+    const session = readStaffSession();
+    if (isFieldStaff(session)) {
+      const home = fieldStaffHome(session);
+      if (home) {
+        setFieldRedirect(true);
+        router.replace(home);
+        return;
       }
-    };
-
-    checkDatabaseStatus();
-  }, []);
+      localStorage.removeItem('userInfo');
+    }
+    setSessionChecked(true);
+  }, [router]);
 
   // 登入驗證邏輯 - 從資料庫驗證
   const handleLogin = async (e: React.FormEvent) => {
@@ -84,9 +72,8 @@ export default function AdminPage() {
     setIsLoggingIn(true);
     setLoginError('');
 
-    let response;
     try {
-      response = await fetch('/api/auth', {
+      const response = await fetch('/api/auth', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -99,86 +86,82 @@ export default function AdminPage() {
 
       const result = await response.json();
 
-      if (result.success) {
-        setIsAuthenticated(true);
-        setLoginError('');
-        // 可以儲存用戶資訊到 localStorage 或狀態管理中
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('userInfo', JSON.stringify(result.data));
-        }
-      } else {
+      if (!result.success) {
         setLoginError(result.message || '登入失敗，請重新輸入');
-        // 如果是因為資料庫表格不存在的錯誤，顯示初始化按鈕
-        // 檢查是否需要初始化資料庫
-        if (result.needsInit || 
-            result.message?.includes('relation "users" does not exist') ||
-            result.message?.includes('資料庫表格不存在') ||
-            result.message?.includes('帳號不存在或已停用')) {
-          setShowInitButton(true);
-          setLoginError('資料庫尚未初始化，請先點選下方按鈕初始化資料庫');
-        }
+        return;
       }
+
+      const accountRole = result.data?.role;
+
+      if (loginForm.loginAs === 'field') {
+        if (accountRole !== 'field') {
+          setLoginError('此帳號不是現場人員');
+          return;
+        }
+        const home = FIELD_SITE_HOME[Number(loginForm.siteId)];
+        if (!home) {
+          setLoginError('此廠區尚未開放現場人員登入');
+          return;
+        }
+        localStorage.setItem('userInfo', JSON.stringify({
+          ...result.data,
+          loginAs: 'field',
+          siteId: Number(loginForm.siteId),
+        }));
+        setFieldRedirect(true);
+        router.replace(home);
+        return;
+      }
+
+      if (accountRole === 'field') {
+        setLoginError('現場人員請改選「現場人員」身份登入');
+        return;
+      }
+
+      localStorage.setItem('userInfo', JSON.stringify({
+        ...result.data,
+        loginAs: 'admin',
+      }));
+      setIsAuthenticated(true);
+      setLoginError('');
     } catch (error) {
       console.error('登入錯誤：', error);
-      // 如果是網路錯誤且可能是資料庫表格不存在，顯示初始化按鈕
-      const errorString = error instanceof Error ? error.message : String(error);
-      if (errorString.includes('relation "users" does not exist') || 
-          errorString.includes('users') ||
-          response?.status === 401) {
-        setShowInitButton(true);
-        setLoginError('資料庫可能尚未初始化，請先點選下方按鈕初始化資料庫');
-      } else {
-        setLoginError('網路錯誤，請稍後再試');
-      }
+      setLoginError('網路錯誤，請稍後再試');
+    } finally {
+      setIsLoggingIn(false);
     }
-
-    setIsLoggingIn(false);
   };
 
   const handleLogout = () => {
     setIsAuthenticated(false);
-    setLoginForm({ username: '', password: '' });
+    setLoginForm({ username: '', password: '', loginAs: 'admin', siteId: '3' });
     // 清除儲存的用戶資訊
     if (typeof window !== 'undefined') {
       localStorage.removeItem('userInfo');
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setLoginForm(prev => ({ ...prev, [name]: value }));
     if (loginError) setLoginError(''); // 清除錯誤訊息
   };
 
-  // 初始化資料庫
-  const handleInitDatabase = async () => {
-    setIsInitializing(true);
-    setInitMessage('');
+  if (fieldRedirect) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-gray-500">前往廠區頁面...</div>
+      </div>
+    );
+  }
 
-    try {
-      const response = await fetch('/api/db/init', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        setInitMessage('資料庫初始化成功！預設管理員帳號：admin，密碼：5241');
-        setShowInitButton(false);
-        setLoginError('');
-      } else {
-        setInitMessage('初始化失敗：' + (result.message || '未知錯誤'));
-      }
-    } catch (error) {
-      console.error('初始化錯誤：', error);
-      setInitMessage('網路錯誤，請稍後再試');
-    }
-
-    setIsInitializing(false);
-  };
+  if (!sessionChecked && !isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-gray-500">驗證中...</div>
+      </div>
+    );
+  }
 
   // 如果未登入，顯示登入表單
   if (!isAuthenticated) {
@@ -186,9 +169,15 @@ export default function AdminPage() {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center px-4">
         <div className="max-w-md w-full space-y-8">
           <div className="text-center">
-            <div className="mx-auto h-12 w-12 text-4xl mb-4">🔐</div>
-            <h2 className="text-3xl font-bold text-gray-900">浩華內部員工登入</h2>
-            <p className="mt-2 text-sm text-gray-600">請輸入您的帳號密碼以存取管理控制台</p>
+            <Image
+              src="/svg/btw_logo_b.svg"
+              alt="浩華 BTW"
+              width={200}
+              height={40}
+              className="mx-auto mb-6 h-auto w-44"
+              priority
+            />
+            <h2 className="text-xl font-bold text-[#00bed6]">浩華內部員工登入</h2>
           </div>
           
           <form className="mt-8 space-y-6 bg-white p-8 rounded-lg shadow-lg" onSubmit={handleLogin}>
@@ -205,8 +194,43 @@ export default function AdminPage() {
                   value={loginForm.username}
                   onChange={handleInputChange}
                   className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                  placeholder="請輸入管理員帳號"
+                  placeholder="請輸入帳號"
                 />
+              </div>
+
+              <div>
+                <label id="login-identity-label" className="block text-sm font-medium text-gray-700 mb-2">
+                  登入身份
+                </label>
+                <div className="grid grid-cols-2 gap-3" role="group" aria-labelledby="login-identity-label">
+                  <select
+                    id="loginAs"
+                    name="loginAs"
+                    aria-label="身份"
+                    value={loginForm.loginAs}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors bg-white"
+                  >
+                    {LOGIN_IDENTITIES.map((identity) => (
+                      <option key={identity.value} value={identity.value}>{identity.label}</option>
+                    ))}
+                  </select>
+                  <select
+                    id="siteId"
+                    name="siteId"
+                    aria-label="廠區"
+                    value={loginForm.siteId}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors bg-white"
+                  >
+                    {LOGIN_FACTORIES.map((factory) => (
+                      <option key={factory.id} value={factory.id}>{factory.label}</option>
+                    ))}
+                  </select>
+                </div>
+                {loginForm.loginAs === 'field' && (
+                  <p className="mt-2 text-xs text-gray-500">目前僅開放世界3廠</p>
+                )}
               </div>
               
               <div>
@@ -235,33 +259,6 @@ export default function AdminPage() {
               </div>
             )}
 
-            {initMessage && (
-              <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">
-                <div className="flex items-center">
-                  <span className="mr-2">✅</span>
-                  {initMessage}
-                </div>
-              </div>
-            )}
-
-            {showInitButton && (
-              <button
-                type="button"
-                onClick={handleInitDatabase}
-                disabled={isInitializing}
-                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors mb-4"
-              >
-                {isInitializing ? (
-                  <div className="flex items-center">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    初始化中...
-                  </div>
-                ) : (
-                  '🛠️ 初始化資料庫'
-                )}
-              </button>
-            )}
-
             <button
               type="submit"
               disabled={isLoggingIn}
@@ -277,12 +274,6 @@ export default function AdminPage() {
               )}
             </button>
           </form>
-
-          <div className="text-center">
-            <p className="text-xs text-gray-500">
-              此為管理員專用頁面，如有疑問請聯繫系統管理員
-            </p>
-          </div>
         </div>
       </div>
     );
