@@ -29,6 +29,16 @@ interface EditUserForm {
   is_active: boolean;
 }
 
+const USER_ROLES = [
+  { value: 'admin', label: '管理員' },
+  { value: 'editor', label: '編輯者' },
+  { value: 'viewer', label: '檢視者' },
+  { value: 'field', label: '現場人員' },
+];
+
+const roleLabel = (role: string) =>
+  USER_ROLES.find((item) => item.value === role)?.label ?? role;
+
 export default function UserManager() {
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -310,7 +320,7 @@ export default function UserManager() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex flex-col">
                         <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 mb-1">
-                          {user.role}
+                          {roleLabel(user.role)}
                         </span>
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                           user.is_active 
@@ -428,9 +438,9 @@ export default function UserManager() {
                     onChange={(e) => setNewUserForm({...newUserForm, role: e.target.value})}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
                   >
-                    <option value="admin">管理員</option>
-                    <option value="editor">編輯者</option>
-                    <option value="viewer">檢視者</option>
+                    {USER_ROLES.map((role) => (
+                      <option key={role.value} value={role.value}>{role.label}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -499,9 +509,9 @@ export default function UserManager() {
                     onChange={(e) => setEditUserForm({...editUserForm, role: e.target.value})}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
                   >
-                    <option value="admin">管理員</option>
-                    <option value="editor">編輯者</option>
-                    <option value="viewer">檢視者</option>
+                    {USER_ROLES.map((role) => (
+                      <option key={role.value} value={role.value}>{role.label}</option>
+                    ))}
                   </select>
                 </div>
 

@@ -17,10 +17,11 @@ const SITE_TABS = [
   { seg: 'schedules', label: '排程管理' },
 ];
 
-export default function SignageNavbar() {
+export default function SignageNavbar({ fieldLocked = false }: { fieldLocked?: boolean }) {
   const pathname = usePathname() || '';
   const router = useRouter();
   const [siteName, setSiteName] = useState<string>('');
+  const locked = fieldLocked;
 
   // 判斷是否在某個廠區內：/admin/signage/site/[id]/...
   const siteMatch = pathname.match(/^\/admin\/signage\/site\/(\d+)(?:\/([^/]+))?/);
@@ -48,12 +49,21 @@ export default function SignageNavbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center gap-3 min-w-0">
+            {locked ? (
+              <div className="flex flex-shrink-0 items-center gap-2.5">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-600 shadow-sm">
+                  <span className="text-sm font-bold text-white">BTW</span>
+                </span>
+                <span className="hidden text-sm font-bold tracking-tight text-slate-800 sm:block">電子看版</span>
+              </div>
+            ) : (
             <Link href="/admin/signage" className="flex flex-shrink-0 items-center gap-2.5">
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-600 shadow-sm">
                 <span className="text-sm font-bold text-white">BTW</span>
               </span>
               <span className="hidden text-sm font-bold tracking-tight text-slate-800 sm:block">電子看版</span>
             </Link>
+            )}
             {siteId && (
               <>
                 <span className="hidden text-slate-300 sm:block" aria-hidden="true">/</span>
@@ -64,7 +74,11 @@ export default function SignageNavbar() {
 
           {/* 桌面導航 */}
           <div className="hidden md:flex items-center gap-1">
-            {siteId ? (
+            {locked ? (
+              <span className="px-3 py-2 text-sm font-medium rounded-lg text-cyan-700 bg-cyan-50">
+                排程管理
+              </span>
+            ) : siteId ? (
               <>
                 {SITE_TABS.map(t => {
                   const active = currentSeg === t.seg;
@@ -105,17 +119,21 @@ export default function SignageNavbar() {
 
             <details className="group relative ml-2">
               <summary className="flex cursor-pointer list-none items-center gap-2 rounded-lg border border-slate-200 bg-white py-1.5 pl-1.5 pr-2 text-sm text-slate-600 transition-colors hover:bg-slate-50 [&::-webkit-details-marker]:hidden">
-                <span className="flex h-7 w-7 items-center justify-center rounded-md bg-slate-100 text-xs font-bold text-slate-600">管</span>
-                <span className="hidden lg:inline">管理員</span>
+                <span className="flex h-7 w-7 items-center justify-center rounded-md bg-slate-100 text-xs font-bold text-slate-600">{locked ? '現' : '管'}</span>
+                <span className="hidden lg:inline">{locked ? '現場人員' : '管理員'}</span>
                 <svg aria-hidden="true" className="h-3.5 w-3.5 transition-transform group-open:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m6 9 6 6 6-6" />
                 </svg>
               </summary>
               <div className="absolute right-0 mt-2 w-40 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
-                <Link href="/admin" className="block px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900">
-                  回主後台
-                </Link>
-                <div className="my-1 border-t border-slate-100" />
+                {!locked && (
+                  <>
+                    <Link href="/admin" className="block px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900">
+                      回主後台
+                    </Link>
+                    <div className="my-1 border-t border-slate-100" />
+                  </>
+                )}
                 <button onClick={handleLogout} className="block w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50">
                   登出
                 </button>
@@ -127,7 +145,9 @@ export default function SignageNavbar() {
         {/* 行動版橫向捲動 */}
         <div className="-mx-4 overflow-x-auto px-4 pb-2 md:hidden">
           <div className="flex gap-1 whitespace-nowrap">
-            {siteId ? (
+            {locked ? (
+              <span className="rounded-lg bg-cyan-50 px-3 py-1.5 text-sm text-cyan-700">排程管理</span>
+            ) : siteId ? (
               <>
                 {SITE_TABS.map(t => {
                   const active = currentSeg === t.seg;
@@ -151,7 +171,7 @@ export default function SignageNavbar() {
                 );
               })
             )}
-            <Link href="/admin" className="rounded-lg bg-slate-50 px-3 py-1.5 text-sm text-slate-500">主後台</Link>
+            {!locked && <Link href="/admin" className="rounded-lg bg-slate-50 px-3 py-1.5 text-sm text-slate-500">主後台</Link>}
             <button onClick={handleLogout} className="rounded-lg px-3 py-1.5 text-sm text-red-600 hover:bg-red-50">登出</button>
           </div>
         </div>

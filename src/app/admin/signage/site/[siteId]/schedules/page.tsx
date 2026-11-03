@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { assetProxyUrl } from '@/lib/signage/assetVersion';
 import { matchFilename } from '@/lib/signage/filenameFilter';
+import AssetHtmlEditor from '@/components/signage/AssetHtmlEditor';
 
 interface Schedule {
   id: number;
@@ -81,13 +82,55 @@ function playlistFitsAutoMode(name: string, mode: 'daily' | 'weekly'): boolean {
   return /(?:^|_)[BLDN]_\d{4}-\d{2}-\d{2}(?:$|[_\-.])/i.test(name)
     || /(?:早餐|午餐|晚餐|宵夜|早|午|晚|宵)_\d{4}-\d{2}-\d{2}/.test(name);
 }
-/** 依開始時間推餐期標籤與顏色 */
-function slotStyle(startTime: string): { label: string; cls: string } {
+type MealKey = 'B' | 'L' | 'D' | 'N';
+interface MealWindow { meal_key: MealKey; start_time: string; end_time: string; enabled: boolean }
+
+const MEAL_BADGE: Record<MealKey, { label: string; cls: string }> = {
+  B: { label: '早', cls: 'bg-orange-100 text-orange-800' },
+  L: { label: '午', cls: 'bg-amber-100 text-amber-800' },
+  D: { label: '晚', cls: 'bg-indigo-100 text-indigo-800' },
+  N: { label: '宵', cls: 'bg-slate-200 text-slate-700' },
+};
+
+function minutesOf(time: string): number {
+  const [h, m] = time.substring(0, 5).split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+}
+
+/** 檔名餐期（F3_L_2026-11-07、F3_午餐_2026-11-07）優先於開始時間。 */
+function mealKeyFromName(name: string | null | undefined): MealKey | null {
+  const text = String(name || '');
+  const alpha = text.match(/(?:^|_)([BLDN])_\d{4}-\d{2}-\d{2}/i);
+  if (alpha) return alpha[1].toUpperCase() as MealKey;
+  const zh = text.match(/(?:^|_)(早餐|午餐|晚餐|宵夜|早|午|晚|宵)_/);
+  if (!zh) return null;
+  if (zh[1] === '早餐' || zh[1] === '早') return 'B';
+  if (zh[1] === '午餐' || zh[1] === '午') return 'L';
+  if (zh[1] === '晚餐' || zh[1] === '晚') return 'D';
+  return 'N';
+}
+
+/** 檔名沒有餐期時，用這個廠區的餐期時段判斷（含跨日宵夜）。 */
+function mealKeyFromWindows(startTime: string, windows: MealWindow[]): MealKey | null {
+  const start = minutesOf(startTime);
+  for (const slot of windows) {
+    if (!slot.enabled) continue;
+    const from = minutesOf(slot.start_time);
+    const to = minutesOf(slot.end_time);
+    const inside = to > from ? start >= from && start < to : start >= from || start < to;
+    if (inside) return slot.meal_key;
+  }
+  return null;
+}
+
+function slotStyle(playlistName: string | null, startTime: string, windows: MealWindow[] = []): { label: string; cls: string } {
+  const key = mealKeyFromName(playlistName) ?? mealKeyFromWindows(startTime, windows);
+  if (key) return MEAL_BADGE[key];
   const h = parseInt(startTime.substring(0, 2), 10);
-  if (h >= 10 && h < 15) return { label: '午', cls: 'bg-amber-100 text-amber-800' };
-  if (h >= 15 && h < 20) return { label: '晚', cls: 'bg-indigo-100 text-indigo-800' };
-  if (h >= 20 || h < 5) return { label: '宵', cls: 'bg-slate-200 text-slate-700' };
-  if (h >= 5 && h < 10) return { label: '早', cls: 'bg-orange-100 text-orange-800' };
+  if (h >= 10 && h < 15) return MEAL_BADGE.L;
+  if (h >= 15 && h < 20) return MEAL_BADGE.D;
+  if (h >= 20 || h < 5) return MEAL_BADGE.N;
+  if (h >= 5 && h < 10) return MEAL_BADGE.B;
   return { label: '', cls: 'bg-cyan-100 text-cyan-800' };
 }
 
@@ -127,6 +170,8 @@ export default function SiteSchedulesPage() {
 
   // 某日詳情
   const [dayDetail, setDayDetail] = useState<string | null>(null);
+  const [previewUrls, setPreviewUrls] = useState<Record<number, string>>({});
+  const [contentAsset, setContentAsset] = useState<{ id: number; filename: string } | null>(null);
 
   // 一鍵列表轉排程（依目前螢幕）
   const [autoMode, setAutoMode] = useState<'daily' | 'weekly' | null>(null);
@@ -168,16 +213,18 @@ export default function SiteSchedulesPage() {
     if (!siteId) return;
     setLoading(true);
     try {
-      const [sc, p, allSched] = await Promise.all([
+      const [sc, p, allSched, meals] = await Promise.all([
         fetch(`/api/signage/screens?site_id=${siteId}`).then(r => r.json()),
         fetch(`/api/signage/playlists?site_id=${siteId}`).then(r => r.json()),
         fetch(`/api/signage/schedules`).then(r => r.json()),
+        fetch(`/api/signage/meal-slots?site_id=${siteId}`).then(r => r.json()),
       ]);
       const siteScreens: Screen[] = (sc.success ? sc.data || [] : [])
         .map((s: Screen) => ({ id: toId(s.id), name: s.name }))
         .filter(s => s.id > 0);
       setScreens(siteScreens);
       if (p.success) setPlaylists(p.data || []);
+      if (meals.success) setMealSlots(meals.data || []);
       const stored = screenStorageKey ? toId(localStorage.getItem(screenStorageKey)) : 0;
       setSelectedScreenId(prev => {
         if (prev != null && siteScreens.some(s => s.id === prev)) return prev;
@@ -246,6 +293,36 @@ export default function SiteSchedulesPage() {
       })
       .sort((a, b) => a.start_time.localeCompare(b.start_time));
   };
+
+  useEffect(() => {
+    if (!dayDetail) {
+      setPreviewUrls({});
+      return;
+    }
+    const list = schedulesForDate(new Date(dayDetail));
+    const playlistIds = [...new Set(list.map(s => s.playlist_id))];
+    let cancelled = false;
+    (async () => {
+      const resolved = await Promise.all(playlistIds.map(async (playlistId) => {
+        try {
+          const res = await fetch(`/api/signage/playlists/${playlistId}`);
+          const json = await res.json();
+          const items = (json.data?.items || []) as Array<{ asset_id?: number | string; blob_url?: string | null }>;
+          const firstAsset = items.find(it => Number.isFinite(Number(it.asset_id)));
+          if (!json.success || !firstAsset?.asset_id) return [playlistId, ''] as const;
+          return [playlistId, assetProxyUrl(Number(firstAsset.asset_id), firstAsset.blob_url)] as const;
+        } catch {
+          return [playlistId, ''] as const;
+        }
+      }));
+      if (cancelled) return;
+      const byPlaylist = new Map(resolved);
+      const next: Record<number, string> = {};
+      for (const schedule of list) next[schedule.id] = byPlaylist.get(schedule.playlist_id) ?? '';
+      setPreviewUrls(next);
+    })();
+    return () => { cancelled = true; };
+  }, [dayDetail, schedules, selectedScreenId]);
 
   // ---- 一鍵列表轉排程（日／週，只套目前這台螢幕） ----
   const openAutoGenerate = (mode: 'daily' | 'weekly') => {
@@ -416,34 +493,20 @@ export default function SiteSchedulesPage() {
     else alert(json.message || '刪除失敗');
   };
 
-  const handlePreview = async (schedule: Schedule) => {
-    const previewWin = window.open('about:blank', '_blank');
-    if (!previewWin) {
-      alert('無法開啟預覽分頁，請確認瀏覽器允許彈出視窗。');
-      return;
-    }
-
-    previewWin.document.title = '載入預覽中...';
-    previewWin.document.body.innerHTML =
-      '<div style="font-family: sans-serif; padding: 16px; color: #4b5563;">載入預覽中...</div>';
-
+  const openContentEditor = async (schedule: Schedule) => {
     try {
       const res = await fetch(`/api/signage/playlists/${schedule.playlist_id}`);
       const json = await res.json();
-      if (!json.success) {
-        throw new Error(json.message || '讀取播放清單失敗');
+      if (!json.success) throw new Error(json.message || '讀取播放清單失敗');
+      const items = (json.data?.items || []) as Array<{ asset_id?: number; filename?: string | null }>;
+      const htmlItem = items.find(item => item.asset_id && item.filename && !/\.(png|jpe?g|gif|webp|svg)$/i.test(item.filename))
+        ?? items.find(item => item.asset_id && item.filename);
+      if (!htmlItem?.asset_id || !htmlItem.filename) {
+        throw new Error('此排程沒有可編輯的素材');
       }
-
-      const items = (json.data?.items || []) as Array<{ asset_id?: number; blob_url?: string | null }>;
-      const firstAsset = items.find(it => Number.isFinite(it.asset_id));
-      if (!firstAsset?.asset_id) {
-        throw new Error('此排程對應的播放清單沒有素材可預覽');
-      }
-
-      previewWin.location.replace(assetProxyUrl(firstAsset.asset_id, firstAsset.blob_url));
+      setContentAsset({ id: Number(htmlItem.asset_id), filename: htmlItem.filename });
     } catch (error) {
-      previewWin.close();
-      const msg = error instanceof Error ? error.message : '開啟預覽失敗';
+      const msg = error instanceof Error ? error.message : '開啟素材失敗';
       alert(msg);
     }
   };
@@ -562,7 +625,7 @@ export default function SiteSchedulesPage() {
                 </span>
                 <div className="space-y-1 overflow-hidden">
                   {daySchedules.slice(0, 3).map(s => {
-                    const st = slotStyle(s.start_time);
+                    const st = slotStyle(s.playlist_name, s.start_time, mealSlots);
                     return (
                       <div key={s.id} className={`text-[11px] leading-tight px-1.5 py-0.5 rounded truncate ${st.cls}`}>
                         <span className="font-semibold">{st.label}</span> {s.playlist_name}
@@ -581,7 +644,7 @@ export default function SiteSchedulesPage() {
 
       {/* 新增/編輯排程 modal */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] p-4" onClick={() => setShowForm(false)}>
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[70] p-4" onClick={() => setShowForm(false)}>
           <div className="bg-white rounded-xl max-w-2xl w-full max-h-[85vh] overflow-y-auto p-6 space-y-4" onClick={e => e.stopPropagation()}>
             <h2 className="text-lg font-semibold">{editing ? '編輯排程' : '新增排程'}</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -705,7 +768,7 @@ export default function SiteSchedulesPage() {
               return (
                 <div className="space-y-2">
                   {list.map(s => {
-                    const st = slotStyle(s.start_time);
+                    const st = slotStyle(s.playlist_name, s.start_time, mealSlots);
                     return (
                       <div key={s.id} className="flex items-center gap-2 bg-gray-50 p-3 rounded-lg">
                         <span className={`text-xs px-2 py-0.5 rounded font-semibold ${st.cls}`}>{st.label}</span>
@@ -720,9 +783,18 @@ export default function SiteSchedulesPage() {
                                 : '（每週）'}
                           </div>
                         </div>
-                        <button onClick={() => handlePreview(s)} className="text-indigo-600 hover:underline text-sm">預覽</button>
-                        <button onClick={() => openEdit(s)} className="text-cyan-600 hover:underline text-sm">編輯</button>
-                        <button onClick={() => handleDelete(s.id)} className="text-red-600 hover:underline text-sm">刪除</button>
+                        <div className="flex shrink-0 items-center gap-2">
+                          {previewUrls[s.id] ? (
+                            <a href={previewUrls[s.id]} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline text-sm">預覽</a>
+                          ) : previewUrls[s.id] === '' ? (
+                            <button type="button" onClick={() => alert('此排程對應的播放清單沒有素材可預覽')} className="text-indigo-600 hover:underline text-sm">預覽</button>
+                          ) : (
+                            <span className="text-gray-300 text-sm">預覽</span>
+                          )}
+                          <button onClick={() => openContentEditor(s)} className="text-cyan-600 hover:underline text-sm">修改</button>
+                          <button onClick={() => openEdit(s)} className="text-amber-600 hover:underline text-sm">排程</button>
+                          <button onClick={() => handleDelete(s.id)} className="text-red-600 hover:underline text-sm">刪除</button>
+                        </div>
                       </div>
                     );
                   })}
@@ -848,6 +920,7 @@ export default function SiteSchedulesPage() {
           </div>
         </div>
       )}
+      <AssetHtmlEditor asset={contentAsset} onClose={() => setContentAsset(null)} />
     </div>
   );
 }

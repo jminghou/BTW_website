@@ -100,6 +100,17 @@ const Contact = () => {
     }
   };
 
+  const getAccentColor = () => {
+    switch (formData.identity) {
+      case '餐飲商家':
+        return 'accent-[#e03838]';
+      case '其他':
+        return 'accent-gray-400';
+      default:
+        return 'accent-[#00bed6]';
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -235,7 +246,7 @@ const Contact = () => {
                         type="checkbox"
                         name="heard_from"
                         value={option}
-                        className="mr-2"
+                        className={`mr-2 h-4 w-4 ${getAccentColor()}`}
                         checked={formData.heard_from.includes(option)}
                         onChange={(e) => handleHeardFromChange(option, e.target.checked)}
                       />

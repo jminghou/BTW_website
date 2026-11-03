@@ -6,6 +6,7 @@ import AnnualGoalsManager from '@/components/admin/AnnualGoalsManager';
 import CompanyStatsManager from '@/components/admin/CompanyStatsManager';
 import PartnersManager from '@/components/admin/PartnersManager';
 import RegionsManager from '@/components/admin/RegionsManager';
+import { fieldStaffHome, isFieldStaff, readStaffSession } from '@/lib/fieldAccess';
 
 interface LoginForm {
   username: string;
@@ -76,6 +77,12 @@ export default function EditorPage() {
 
   // 檢查登入狀態
   useEffect(() => {
+    const session = readStaffSession();
+    if (isFieldStaff(session)) {
+      router.replace(fieldStaffHome(session) || '/admin');
+      return;
+    }
+
     const checkAuthStatus = () => {
       const authData = localStorage.getItem('admin_auth');
       if (authData) {
@@ -95,7 +102,7 @@ export default function EditorPage() {
     };
 
     checkAuthStatus();
-  }, []);
+  }, [router]);
 
   // 登入處理
   const handleLogin = async (e: React.FormEvent) => {
