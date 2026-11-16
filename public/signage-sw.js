@@ -10,7 +10,7 @@
  *       不寫進 Cache Storage，避免離線時拿別台螢幕的 JSON 來頂替。
  *       也不要對這支請求下 cache: 'no-store'，否則 CDN 的 s-maxage 可能被跳過。
  *   - 播放頁面導覽：network-first（線上最新、離線時退回上次頁面）
- *   - 售完 GET（/api/signage/soldout）：不進本機快取，交給 CDN 依 ?key= 快取。
+ *   - 售完 GET（/api/signage/soldout）：不進本機快取，也不進 HTTP 快取。
  *   - 版本化素材 HTML（/api/signage/asset/）與共用資源（/signage-assets/）：cache-first
  *   - 素材頁面內的外部圖片/字型/樣式/腳本：cache-first
  *   - 其餘請求不介入
@@ -18,7 +18,7 @@
  * 不支援 Service Worker 的裝置由播放端 feature-detect 略過註冊，自動退回 Layer 1。
  */
 
-const CACHE = 'signage-cache-v7';
+const CACHE = 'signage-cache-v8';
 
 self.addEventListener('install', () => {
   self.skipWaiting();
@@ -120,13 +120,10 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 售完 GET：不進本機 Cache Storage。CDN 依 ?key= 快取，不同菜單不會混用。
+  // 售完 GET：不進本機 Cache Storage，並繞過 HTTP 快取。
+  // 舊回應會把剛點下去的售完蓋掉。
   if (sameOrigin && url.pathname === '/api/signage/soldout') {
-    event.respondWith(fetch(req.url, {
-      method: 'GET',
-      credentials: 'same-origin',
-      cache: 'default',
-    }));
+    event.respondWith(fetch(req, { cache: 'no-store' }));
     return;
   }
 

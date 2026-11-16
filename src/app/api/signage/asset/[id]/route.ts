@@ -127,14 +127,14 @@ html.__signage-pending body {
   return `${output}\n${script}`;
 }
 
-const VIS_TV_SLIDESHOW_SRC = '/signage-assets/js/vis_tv_slideshow.js?v=4';
+const VIS_TV_SLIDESHOW_SRC = '/signage-assets/js/vis_tv_slideshow.js?v=5';
 
 /** vis_tv 三欄菜單：確保載入現行售完同步腳本（含舊檔仍引用 spotlight_slideshow.js 的情況） */
 function ensureVisTvSoldOutRuntime(html: string): string {
   const isVisTv = html.includes('menu-list-item') && html.includes('spotlight-item');
   if (!isVisTv) return html;
 
-  let out = html.replace(/vis_tv_slideshow\.js(\?v=\d+)?/g, 'vis_tv_slideshow.js?v=4');
+  let out = html.replace(/vis_tv_slideshow\.js(\?v=\d+)?/g, 'vis_tv_slideshow.js?v=5');
   if (out.includes('vis_tv_slideshow.js')) return out;
 
   if (/spotlight_slideshow\.js/.test(out)) {

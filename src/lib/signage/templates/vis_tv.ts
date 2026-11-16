@@ -455,10 +455,25 @@ const CUSTOM_CSS = `
             font-weight: 700;
         }
 
-        /* 第一次點擊提示（需再點一次才切換售完） */
-        .menu-list-item.tap-armed {
-            background-color: rgba(255, 255, 255, 0.45);
-            border-radius: 16px;
+        /* 單擊切換售完。同步中／失敗由 vis_tv_slideshow.js 標在餐點列上。 */
+        .menu-list-item .soldout-sync {
+            display: inline-block;
+            align-self: flex-start;
+            margin-top: 2px;
+            font-size: 16px;
+            font-weight: 800;
+            line-height: 1.2;
+            padding: 2px 8px;
+            border-radius: 8px;
+            pointer-events: none;
+        }
+        .menu-list-item .soldout-sync[data-state="syncing"] {
+            color: #7a4b00;
+            background: #ffe08a;
+        }
+        .menu-list-item .soldout-sync[data-state="failed"] {
+            color: #ffffff;
+            background: #c62828;
         }
 
         /* 售完：文字變灰、編號改為「售完」；號碼不重排 */
@@ -621,7 +636,7 @@ function generateGroupHtml(itemsRaw: MealItem[]): { html: string; warnings: stri
 
   html += `
     </div>
-    <script src="../../js/vis_tv_slideshow.js?v=4"></script>
+    <script src="../../js/vis_tv_slideshow.js?v=5"></script>
     <script>
     /* 電視盒等比縮放：把 1920x1080 設計畫布等比縮放並置中，
        填滿電視盒實際視窗（含非 16:9 時自動留邊置中，不裁切、不偏角落） */

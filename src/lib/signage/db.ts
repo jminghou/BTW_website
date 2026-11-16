@@ -209,8 +209,12 @@ async function ensureScheduleDateColumns() {
 }
 
 /**
- * 售完狀態表：以「據點|時段|日期」為 key，給手機與廣告機共用。
+ * 售完狀態表：以「據點|時段|日期」或素材 id 為 key，給手機與廣告機共用。
  * 用 rawSql，避免寫入時觸發整組看版快取失效。
+ *
+ * DDL 只在這個執行實例的第一次售完請求跑。暖機後的 GET／POST 直接重用
+ * 同一個 promise，不再每次打 CREATE TABLE（那會把 Neon compute 叫醒）。
+ * 失敗會清掉 promise，下一次請求還能重試。
  */
 let soldOutTableReady: Promise<void> | null = null;
 
@@ -249,34 +253,153 @@ function parseDishNames(raw: unknown): string[] {
   return [];
 }
 
+/** 把 updated_at 換成可比較的毫秒版號。無法辨識時回 null，避免把 0 當成新版本。 */
+function coerceVersion(raw: unknown): number | null {
+  if (raw instanceof Date) {
+    const ms = raw.getTime();
+    return Number.isFinite(ms) && ms > 0 ? ms : null;
+  }
+  if (typeof raw === 'bigint') {
+    const ms = Number(raw);
+    return Number.isFinite(ms) && ms > 0 ? Math.round(ms) : null;
+  }
+  if (typeof raw === 'number' && Number.isFinite(raw) && raw > 0) {
+    return raw < 1e12 ? Math.round(raw * 1000) : Math.round(raw);
+  }
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (!trimmed) return null;
+    const asNumber = Number(trimmed);
+    if (Number.isFinite(asNumber) && asNumber > 0) {
+      return asNumber < 1e12 ? Math.round(asNumber * 1000) : Math.round(asNumber);
+    }
+    const parsed = Date.parse(trimmed);
+    if (!Number.isNaN(parsed) && parsed > 0) return parsed;
+  }
+  return null;
+}
+
+type SoldOutSnapshot = { data: string[]; version: number };
+
+function snapshotFromRow(row: { dish_names?: unknown; version?: unknown } | undefined): SoldOutSnapshot | null {
+  if (!row) return null;
+  const version = coerceVersion(row.version);
+  if (version == null) return null;
+  return { data: parseDishNames(row.dish_names), version };
+}
+
 export async function getSoldOutDishes(menuKey: string) {
   try {
     await ensureSoldOutTable();
     const rows = await rawSql`
-      SELECT dish_names FROM signage_soldout WHERE menu_key = ${menuKey} LIMIT 1;
+      SELECT dish_names,
+             (EXTRACT(EPOCH FROM updated_at) * 1000)::bigint AS version
+      FROM signage_soldout
+      WHERE menu_key = ${menuKey}
+      LIMIT 1;
     `;
-    const dishNames = rows.length > 0 ? parseDishNames((rows[0] as { dish_names: unknown }).dish_names) : [];
-    return { success: true as const, data: dishNames };
+    if (rows.length === 0) {
+      return { success: true as const, data: [] as string[], version: 0 };
+    }
+    const snapshot = snapshotFromRow(rows[0] as { dish_names?: unknown; version?: unknown });
+    if (!snapshot) {
+      return { success: false as const, error: new Error('售完版本無效') };
+    }
+    return { success: true as const, data: snapshot.data, version: snapshot.version };
   } catch (error) {
     console.error('讀取售完狀態時發生錯誤：', error);
     return { success: false as const, error };
   }
 }
 
+/**
+ * 整份覆寫。保留給仍送 `{ key, items }` 的呼叫端。
+ * 版號用 updated_at，且至少比原列新 1 毫秒，避免同一毫秒內的寫入比不出先後。
+ */
 export async function setSoldOutDishes(menuKey: string, dishNames: string[]) {
   try {
     await ensureSoldOutTable();
     const payload = JSON.stringify(dishNames);
-    await rawSql`
+    const rows = await rawSql`
       INSERT INTO signage_soldout (menu_key, dish_names, updated_at)
-      VALUES (${menuKey}, ${payload}, CURRENT_TIMESTAMP)
+      VALUES (${menuKey}, ${payload}, clock_timestamp())
       ON CONFLICT (menu_key) DO UPDATE
         SET dish_names = EXCLUDED.dish_names,
-            updated_at = CURRENT_TIMESTAMP;
+            updated_at = GREATEST(
+              clock_timestamp(),
+              signage_soldout.updated_at + INTERVAL '1 millisecond'
+            )
+      RETURNING dish_names,
+                (EXTRACT(EPOCH FROM updated_at) * 1000)::bigint AS version;
     `;
-    return { success: true as const };
+    const snapshot = snapshotFromRow(rows[0] as { dish_names?: unknown; version?: unknown });
+    if (!snapshot) {
+      return { success: false as const, error: new Error('寫入售完狀態後沒有取得版本') };
+    }
+    return { success: true as const, data: snapshot.data, version: snapshot.version };
   } catch (error) {
     console.error('寫入售完狀態時發生錯誤：', error);
+    return { success: false as const, error };
+  }
+}
+
+/**
+ * 單項明示寫入：在同一道 SQL 裡把一道菜加進或移出售完清單。
+ * 不會用整份清單覆寫，因此並行的兩次點擊不會互相清掉。
+ * 已達 maxItems 且這道菜原本不在清單裡時，維持原清單（呼叫端依回傳內容判斷）。
+ */
+export async function mergeSoldOutDish(
+  menuKey: string,
+  name: string,
+  soldOut: boolean,
+  maxItems: number,
+) {
+  try {
+    await ensureSoldOutTable();
+    const seed = soldOut ? JSON.stringify([name]) : '[]';
+    const rows = await rawSql`
+      INSERT INTO signage_soldout AS so (menu_key, dish_names, updated_at)
+      VALUES (${menuKey}, ${seed}, clock_timestamp())
+      ON CONFLICT (menu_key) DO UPDATE
+        SET dish_names = (
+          WITH base AS (
+            SELECT CASE
+              WHEN left(btrim(so.dish_names), 1) = '[' THEN so.dish_names::jsonb
+              ELSE '[]'::jsonb
+            END AS names
+          ),
+          merged AS (
+            SELECT item
+            FROM base, LATERAL jsonb_array_elements_text(base.names) AS item
+            WHERE ${soldOut}::boolean OR item <> ${name}
+            UNION
+            SELECT ${name}::text
+            FROM base
+            WHERE ${soldOut}::boolean
+              AND (
+                base.names @> jsonb_build_array(${name}::text)
+                OR jsonb_array_length(base.names) < ${maxItems}
+              )
+          )
+          SELECT COALESCE(
+            (SELECT jsonb_agg(to_jsonb(item) ORDER BY item) FROM merged),
+            '[]'::jsonb
+          )::text
+        ),
+        updated_at = GREATEST(
+          clock_timestamp(),
+          so.updated_at + INTERVAL '1 millisecond'
+        )
+      RETURNING dish_names,
+                (EXTRACT(EPOCH FROM updated_at) * 1000)::bigint AS version;
+    `;
+    const snapshot = snapshotFromRow(rows[0] as { dish_names?: unknown; version?: unknown });
+    if (!snapshot) {
+      return { success: false as const, error: new Error('合併售完狀態後沒有取得版本') };
+    }
+    return { success: true as const, data: snapshot.data, version: snapshot.version };
+  } catch (error) {
+    console.error('合併售完狀態時發生錯誤：', error);
     return { success: false as const, error };
   }
 }
