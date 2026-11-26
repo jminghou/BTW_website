@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { signageAction } from '@/components/signage/actionStyles';
 
 // ===== 重點檢視：從菜單 HTML 解析出可編輯的欄位（餐廳／中文菜名／英文名／圖片／價格） =====
 // 作法：用 DOMParser 把整份 HTML 解析成 DOM，找出每道菜的節點並標記 data-focus-id。
@@ -902,7 +903,7 @@ export default function AssetHtmlEditor({
                     })}
 
                     <button type="button" onClick={handleAddRestaurant}
-                      className="inline-flex items-center gap-1 border border-dashed border-cyan-400 text-cyan-700 hover:bg-cyan-50 px-4 py-2 rounded-lg text-sm font-medium">
+                      className={`${signageAction.tool} gap-1 border-dashed`}>
                       <span className="text-lg leading-none">＋</span> 新增餐廳
                     </button>
                   </div>
@@ -922,11 +923,11 @@ export default function AssetHtmlEditor({
               <span className="text-sm font-medium text-red-600">{editMsg}</span>
               <div className="flex items-center gap-2">
                 <button onClick={closeEdit} disabled={editSaving}
-                  className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm disabled:opacity-50">
+                  className={signageAction.quiet}>
                   取消
                 </button>
                 <button onClick={handleSaveEdit} disabled={editSaving || editLoading}
-                  className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50">
+                  className={signageAction.primary}>
                   {editSaving ? '儲存中...' : '儲存'}
                 </button>
               </div>

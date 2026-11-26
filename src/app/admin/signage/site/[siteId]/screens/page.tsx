@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
+import { signageAction } from '@/components/signage/actionStyles';
 
 interface Screen {
   id: number;
@@ -89,7 +90,7 @@ export default function SiteScreensPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">螢幕管理</h1>
-        <button onClick={openNew} className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+        <button onClick={openNew} className={signageAction.primary}>
           + 新增螢幕
         </button>
       </div>
@@ -111,10 +112,10 @@ export default function SiteScreensPage() {
             </div>
             {error && <p className="text-red-600 text-sm">{error}</p>}
             <div className="flex gap-2">
-              <button type="submit" className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+              <button type="submit" className={signageAction.primary}>
                 {editing ? '更新' : '建立'}
               </button>
-              <button type="button" onClick={() => setShowForm(false)} className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium">
+              <button type="button" onClick={() => setShowForm(false)} className={signageAction.quiet}>
                 取消
               </button>
             </div>
@@ -149,9 +150,9 @@ export default function SiteScreensPage() {
                   </button>
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <a href={`/signage/player/${s.unique_key}`} target="_blank" rel="noopener noreferrer" className="text-cyan-600 hover:underline mr-3">預覽</a>
-                  <button onClick={() => openEdit(s)} className="text-cyan-600 hover:underline mr-3">編輯</button>
-                  <button onClick={() => handleDelete(s.id)} className="text-red-600 hover:underline">刪除</button>
+                  <a href={`/signage/player/${s.unique_key}`} target="_blank" rel="noopener noreferrer" className={`${signageAction.link} mr-3`}>預覽</a>
+                  <button onClick={() => openEdit(s)} className={`${signageAction.link} mr-3`}>編輯</button>
+                  <button onClick={() => handleDelete(s.id)} className={signageAction.linkDanger}>刪除</button>
                 </td>
               </tr>
             ))}

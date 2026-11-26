@@ -1998,6 +1998,107 @@ export async function updateSchedule(id: number, data: Partial<ScheduleInput>) {
   }
 }
 
+function parseScheduleWeekdays(raw: unknown): number[] {
+  try {
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map(Number).filter(n => Number.isInteger(n) && n >= 1 && n <= 7);
+  } catch {
+    return [];
+  }
+}
+
+function monthBounds(year: number, month: number): { start: string; end: string } {
+  const last = new Date(year, month, 0).getDate();
+  const mm = String(month).padStart(2, '0');
+  return {
+    start: `${year}-${mm}-01`,
+    end: `${year}-${mm}-${String(last).padStart(2, '0')}`,
+  };
+}
+
+/** 區間內是否至少有一天的 ISO 星期（1=一…7=日）落在 days。一個月最多 31 天。 */
+function rangeIncludesWeekday(from: string, to: string, days: number[]): boolean {
+  if (days.length === 0 || from > to) return false;
+  const wanted = new Set(days);
+  let cur = from;
+  for (let i = 0; i < 31; i++) {
+    if (wanted.has(isoWeekdayLocal(cur))) return true;
+    if (cur >= to) return false;
+    cur = addOneDay(cur);
+  }
+  return false;
+}
+
+function scheduleAppearsInMonth(
+  row: { play_date: unknown; start_date: unknown; end_date: unknown; days_of_week: unknown },
+  year: number,
+  month: number,
+): boolean {
+  const { start, end } = monthBounds(year, month);
+  const playDate = normalizeDbDate(row.play_date);
+  if (playDate) return playDate >= start && playDate <= end;
+
+  const weekdays = parseScheduleWeekdays(row.days_of_week);
+  const rangeStart = normalizeDbDate(row.start_date);
+  const rangeEnd = normalizeDbDate(row.end_date);
+  if (rangeStart && rangeEnd) {
+    const from = rangeStart > start ? rangeStart : start;
+    const to = rangeEnd < end ? rangeEnd : end;
+    return rangeIncludesWeekday(from, to, weekdays);
+  }
+  return rangeIncludesWeekday(start, end, weekdays);
+}
+
+/**
+ * 刪除某螢幕在指定月份月曆上會出現的全部排程。
+ * 指定單日只刪該月日期；日期區間與每週循環只要這個月看得到，整筆刪除。
+ */
+export async function deleteSchedulesForMonth(
+  siteId: number,
+  screenId: number,
+  year: number,
+  month: number,
+) {
+  try {
+    if (!Number.isInteger(year) || year < 2000 || year > 2100 || !Number.isInteger(month) || month < 1 || month > 12) {
+      return { success: false, error: '年份或月份不正確' };
+    }
+    const screens = await sql`
+      SELECT id FROM signage_screens WHERE site_id = ${siteId} AND id = ${screenId};
+    `;
+    if ((screens as Array<{ id: number }>).length === 0) {
+      return { success: false, error: '找不到指定螢幕，或該螢幕不屬於此廠區' };
+    }
+
+    const rows = await sql`
+      SELECT id, play_date, start_date, end_date, days_of_week
+      FROM signage_schedules
+      WHERE screen_id = ${screenId};
+    ` as Array<{ id: number; play_date: unknown; start_date: unknown; end_date: unknown; days_of_week: unknown }>;
+
+    const ids = rows
+      .filter(row => scheduleAppearsInMonth(row, year, month))
+      .map(row => Number(row.id))
+      .filter(id => Number.isFinite(id) && id > 0);
+
+    if (ids.length === 0) {
+      return { success: true, data: { deleted: 0 } };
+    }
+
+    const deleted = await sql`
+      DELETE FROM signage_schedules
+      WHERE screen_id = ${screenId} AND id = ANY(${ids})
+      RETURNING id;
+    ` as Array<{ id: number }>;
+
+    return { success: true, data: { deleted: deleted.length } };
+  } catch (error) {
+    console.error('刪除當月排程時發生錯誤：', error);
+    return { success: false, error };
+  }
+}
+
 export async function deleteSchedule(id: number) {
   try {
     const result = await sql`

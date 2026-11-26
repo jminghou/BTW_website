@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { assetProxyUrl } from '@/lib/signage/assetVersion';
 import { matchFilename } from '@/lib/signage/filenameFilter';
 import AssetHtmlEditor from '@/components/signage/AssetHtmlEditor';
+import { signageAction } from '@/components/signage/actionStyles';
 
 interface Schedule {
   id: number;
@@ -391,6 +392,40 @@ export default function SiteSchedulesPage() {
     }
   };
 
+  const handleClearMonth = async () => {
+    if (!siteId || !selectedScreenId) return;
+    const label = selectedScreen?.name || '目前螢幕';
+    const ok = confirm(
+      `將清空「${label}」${monthLabel}的全部排程。\n指定單日、與這個月重疊的日期區間，以及每週循環都會刪除，而且無法復原。\n確定要刪除嗎？`,
+    );
+    if (!ok) return;
+
+    setBusy(true);
+    setActionMsg('');
+    try {
+      const res = await fetch('/api/signage/schedules/clear-month', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          site_id: Number(siteId),
+          screen_id: selectedScreenId,
+          year: cursor.getFullYear(),
+          month: cursor.getMonth() + 1,
+        }),
+      });
+      const json = await res.json();
+      setActionMsg(json.message || (json.success ? '已清空' : '清空失敗'));
+      if (json.success) {
+        setDayDetail(null);
+        await load();
+      }
+    } catch {
+      setActionMsg('網路錯誤');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleDeduplicate = async () => {
     if (!siteId || !selectedScreenId) return;
     const picked = (prompt('請輸入保留方式：latest（保留最新）或 oldest（保留最舊）', 'latest') || '').trim().toLowerCase();
@@ -515,11 +550,11 @@ export default function SiteSchedulesPage() {
   const noBase = (screens.length === 0 || playlists.length === 0) && !loading;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button onClick={() => openNew()} disabled={!selectedScreenId || playlists.length === 0}
-            className="bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium">
+            className={signageAction.primary}>
             新增排程
           </button>
           <label className="relative inline-flex">
@@ -530,31 +565,35 @@ export default function SiteSchedulesPage() {
                 const mode = e.target.value;
                 if (mode === 'daily' || mode === 'weekly') openAutoGenerate(mode);
               }}
-              className="appearance-none bg-white border-2 border-green-600 text-green-700 hover:bg-green-50 disabled:opacity-50 pl-4 pr-9 py-2 rounded-lg text-sm font-medium cursor-pointer"
+              className={signageAction.toolSelect}
             >
               <option value="" disabled>一鍵列表轉排程</option>
               <option value="daily">一鍵轉日排程</option>
               <option value="weekly">一鍵轉週排程</option>
             </select>
-            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-green-700 text-xs">▼</span>
+            <span className={signageAction.toolChevron}>▼</span>
           </label>
           <button onClick={handleDeduplicate} disabled={busy || !selectedScreenId}
-            className="bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium">
+            className={signageAction.danger}>
             清理重複排程
           </button>
+          <button onClick={handleClearMonth} disabled={busy || !selectedScreenId}
+            className={signageAction.danger}>
+            刪除當月排程
+          </button>
           <button onClick={openMealSlots}
-            className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-medium">
+            className={signageAction.tool}>
             餐期排程
           </button>
           {actionMsg && <span className="text-sm text-gray-600 ml-1">{actionMsg}</span>}
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setCursor(c => new Date(c.getFullYear(), c.getMonth() - 1, 1))}
-            className="bg-gray-500 hover:bg-gray-600 text-white w-10 h-10 rounded-lg">‹</button>
+            className={signageAction.quietIcon}>‹</button>
           <button onClick={() => { const n = new Date(); setCursor(new Date(n.getFullYear(), n.getMonth(), 1)); }}
-            className="bg-gray-500 hover:bg-gray-600 text-white px-4 h-10 rounded-lg text-sm font-medium">今天</button>
+            className={signageAction.quiet}>今天</button>
           <button onClick={() => setCursor(c => new Date(c.getFullYear(), c.getMonth() + 1, 1))}
-            className="bg-gray-500 hover:bg-gray-600 text-white w-10 h-10 rounded-lg">›</button>
+            className={signageAction.quietIcon}>›</button>
         </div>
       </div>
 
@@ -564,45 +603,36 @@ export default function SiteSchedulesPage() {
         </div>
       )}
 
-      <div className="bg-white border border-gray-200 rounded-lg px-5 py-4 space-y-3">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-800">{monthLabel}</h2>
-          <p className="text-sm text-gray-500 mt-1">
-            {selectedScreen ? `目前月曆：${selectedScreen.name}` : '請先選擇要查看的螢幕'}
-          </p>
-        </div>
-        {screens.length > 0 ? (
-          <div>
-            <div className="text-xs font-medium text-gray-500 mb-2">選擇螢幕（每台獨立一張月曆）</div>
-            <div className="flex flex-wrap gap-2">
-              {screens.map(s => {
-                const active = s.id === selectedScreenId;
-                return (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => selectScreen(s.id)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
-                      active
-                        ? 'bg-cyan-600 text-white border-cyan-600 shadow-sm'
-                        : 'bg-cyan-50 text-cyan-800 border-cyan-200 hover:bg-cyan-100'
-                    }`}
-                  >
-                    {s.name}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        ) : !loading && (
-          <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-            此廠區尚無螢幕，請先到「螢幕管理」新增。
-          </p>
-        )}
-      </div>
-
       {/* 月曆 */}
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <div className="flex flex-wrap items-center gap-x-2 px-4 py-1.5 text-sm leading-5 text-slate-700">
+          <span className="font-semibold text-slate-900">{monthLabel}</span>
+          {selectedScreen && (
+            <>
+              <span className="text-slate-300" aria-hidden="true">·</span>
+              {screens.length > 1 ? (
+                <label className="relative inline-flex items-center">
+                  <select
+                    aria-label="版位"
+                    value={selectedScreenId ?? ''}
+                    onChange={e => selectScreen(Number(e.target.value))}
+                    className="h-7 cursor-pointer appearance-none bg-transparent pr-4 text-sm text-slate-700 outline-none"
+                  >
+                    {screens.map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                  <span className="pointer-events-none absolute right-0 text-[10px] text-slate-400">▾</span>
+                </label>
+              ) : (
+                <span>{selectedScreen.name}</span>
+              )}
+            </>
+          )}
+          {!loading && screens.length === 0 && (
+            <span className="text-slate-400">尚未建立版位</span>
+          )}
+        </div>
         <div className="grid grid-cols-7 bg-cyan-500 text-white text-center font-medium">
           {WEEK_HEADERS.map(w => <div key={w} className="py-3">{w}</div>)}
         </div>
@@ -746,8 +776,8 @@ export default function SiteSchedulesPage() {
                 </div>
               )}
               <div className="flex gap-2">
-                <button type="submit" className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg text-sm font-medium">{editing ? '更新' : '建立'}</button>
-                <button type="button" onClick={() => setShowForm(false)} className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium">取消</button>
+                <button type="submit" className={signageAction.primary}>{editing ? '更新' : '建立'}</button>
+                <button type="button" onClick={() => setShowForm(false)} className={signageAction.quiet}>取消</button>
               </div>
             </form>
           </div>
@@ -785,15 +815,15 @@ export default function SiteSchedulesPage() {
                         </div>
                         <div className="flex shrink-0 items-center gap-2">
                           {previewUrls[s.id] ? (
-                            <a href={previewUrls[s.id]} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline text-sm">預覽</a>
+                            <a href={previewUrls[s.id]} target="_blank" rel="noopener noreferrer" className={signageAction.link}>預覽</a>
                           ) : previewUrls[s.id] === '' ? (
-                            <button type="button" onClick={() => alert('此排程對應的播放清單沒有素材可預覽')} className="text-indigo-600 hover:underline text-sm">預覽</button>
+                            <button type="button" onClick={() => alert('此排程對應的播放清單沒有素材可預覽')} className={signageAction.link}>預覽</button>
                           ) : (
                             <span className="text-gray-300 text-sm">預覽</span>
                           )}
-                          <button onClick={() => openContentEditor(s)} className="text-cyan-600 hover:underline text-sm">修改</button>
-                          <button onClick={() => openEdit(s)} className="text-amber-600 hover:underline text-sm">排程</button>
-                          <button onClick={() => handleDelete(s.id)} className="text-red-600 hover:underline text-sm">刪除</button>
+                          <button onClick={() => openContentEditor(s)} className={signageAction.link}>修改</button>
+                          <button onClick={() => openEdit(s)} className={signageAction.link}>排程</button>
+                          <button onClick={() => handleDelete(s.id)} className={signageAction.linkDanger}>刪除</button>
                         </div>
                       </div>
                     );
@@ -805,7 +835,7 @@ export default function SiteSchedulesPage() {
               <button
                 onClick={() => { const d = dayDetail; setDayDetail(null); openNew(d); }}
                 disabled={!selectedScreenId || playlists.length === 0}
-                className="bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                className={signageAction.primary}>
                 + 在這天新增排程
               </button>
             </div>
@@ -864,9 +894,9 @@ export default function SiteSchedulesPage() {
             </div>
             <div className="flex justify-end gap-2 border-t pt-4">
               <button type="button" disabled={busy} onClick={() => setAutoMode(null)}
-                className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium">取消</button>
+                className={signageAction.quiet}>取消</button>
               <button type="button" disabled={busy} onClick={handleAutoGenerate}
-                className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                className={signageAction.primary}>
                 {busy ? '產生中...' : '開始產生'}
               </button>
             </div>
@@ -882,10 +912,6 @@ export default function SiteSchedulesPage() {
               <h2 className="text-lg font-semibold">餐期排程設定</h2>
               <button onClick={() => setShowMealSlots(false)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
             </div>
-            <p className="text-sm text-gray-500">
-              「一鍵轉日排程／一鍵轉週排程」會依檔名餐期（B/L/D/N）對應到下列時段，並只套用到你目前選中的那台螢幕。結束時間若早於開始時間，視為**跨日**（自動拆成當日與隔日兩段，適合宵夜）。
-            </p>
-
             <div className="space-y-2">
               <div className="grid grid-cols-[auto_1fr_1fr] gap-3 items-center text-xs font-medium text-gray-500 px-1">
                 <span>啟用 / 餐期</span><span>開始時間</span><span>結束時間</span>
@@ -913,8 +939,8 @@ export default function SiteSchedulesPage() {
             <div className="flex items-center justify-between border-t pt-4">
               <span className="text-sm text-gray-500">{mealSaveMsg}</span>
               <div className="flex gap-2">
-                <button onClick={() => setShowMealSlots(false)} className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium">關閉</button>
-                <button onClick={saveMealSlots} className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg text-sm font-medium">儲存設定</button>
+                <button onClick={() => setShowMealSlots(false)} className={signageAction.quiet}>關閉</button>
+                <button onClick={saveMealSlots} className={signageAction.primary}>儲存設定</button>
               </div>
             </div>
           </div>

@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation';
 import { assetProxyUrl } from '@/lib/signage/assetVersion';
 import { extractFilenameDate, matchFilename } from '@/lib/signage/filenameFilter';
 import { isImageFilename } from '@/lib/signage/mediaType';
+import { signageAction } from '@/components/signage/actionStyles';
 
 interface Asset {
   id: number;
@@ -399,6 +400,10 @@ export default function SiteAssetsPage() {
       <div className="bg-white border border-gray-200 rounded-lg p-6">
         <h2 className="text-lg font-semibold mb-4">上傳素材</h2>
         <div className="flex gap-2 mb-5 border-b border-gray-200">
+          <button type="button" onClick={() => switchMode('json')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${uploadMode === 'json' ? 'border-cyan-600 text-cyan-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+            上傳 JSON 自動轉檔
+          </button>
           <button type="button" onClick={() => switchMode('html')}
             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${uploadMode === 'html' ? 'border-cyan-600 text-cyan-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
             直接上傳 HTML
@@ -406,10 +411,6 @@ export default function SiteAssetsPage() {
           <button type="button" onClick={() => switchMode('image')}
             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${uploadMode === 'image' ? 'border-cyan-600 text-cyan-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
             上傳圖片
-          </button>
-          <button type="button" onClick={() => switchMode('json')}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${uploadMode === 'json' ? 'border-cyan-600 text-cyan-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
-            上傳 JSON 自動轉檔
           </button>
         </div>
 
@@ -459,8 +460,8 @@ export default function SiteAssetsPage() {
               )}
             </div>
           )}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="shrink-0 text-sm font-medium text-gray-700">
               {uploadMode === 'json'
                 ? '選擇 JSON 檔（可一次選多個 .json） *'
                 : uploadMode === 'image'
@@ -474,12 +475,12 @@ export default function SiteAssetsPage() {
                   ? '.png,.jpg,.jpeg,image/png,image/jpeg'
                   : '.html'
             } multiple required
-              className="w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-cyan-50 file:text-cyan-700 hover:file:bg-cyan-100" />
+              className="min-w-0 flex-1 text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-cyan-50 file:text-cyan-700 hover:file:bg-cyan-100" />
+            <button type="submit" disabled={uploading}
+              className={`${signageAction.primary} shrink-0`}>
+              {uploading ? (uploadMode === 'json' ? '轉檔中...' : '上傳中...') : (uploadMode === 'json' ? '⚙ 轉檔並上傳' : '⬆ 上傳')}
+            </button>
           </div>
-          <button type="submit" disabled={uploading}
-            className="bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium">
-            {uploading ? (uploadMode === 'json' ? '轉檔中...' : '上傳中...') : (uploadMode === 'json' ? '⚙ 轉檔並上傳' : '⬆ 上傳')}
-          </button>
           {uploadResult && <p className="text-sm font-medium">{uploadResult}</p>}
           {uploadDetail.length > 0 && (
             <ul className="text-sm space-y-1 bg-gray-50 rounded-lg p-3 max-h-60 overflow-y-auto">
@@ -509,7 +510,7 @@ export default function SiteAssetsPage() {
 
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <button onClick={toggleSelectAll} className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-sm">
+            <button onClick={toggleSelectAll} className={signageAction.quiet}>
               {allFilteredSelected ? '取消全選' : '全選'}
             </button>
             <span className="text-sm text-gray-500">已選 {selectedIds.size} 個</span>
@@ -519,15 +520,15 @@ export default function SiteAssetsPage() {
           </div>
           <div className="flex items-center gap-2">
             <button onClick={handleBatchScreenshot} disabled={selectedIds.size === 0 || batchShooting}
-              className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-30 text-white px-3 py-1.5 rounded-lg text-sm">
+              className={signageAction.tool}>
               {batchShooting ? '批次轉檔中…' : `批次轉檔 (${selectedIds.size})`}
             </button>
             <button onClick={handleConvertToPlaylists} disabled={selectedIds.size === 0 || converting}
-              className="bg-green-600 hover:bg-green-700 disabled:opacity-30 text-white px-3 py-1.5 rounded-lg text-sm">
+              className={signageAction.tool}>
               素材轉列表 ({selectedIds.size})
             </button>
             <button onClick={handleBatchDelete} disabled={selectedIds.size === 0}
-              className="bg-red-600 hover:bg-red-700 disabled:opacity-30 text-white px-3 py-1.5 rounded-lg text-sm">
+              className={signageAction.danger}>
               刪除選取項目 ({selectedIds.size})
             </button>
           </div>
@@ -601,17 +602,17 @@ export default function SiteAssetsPage() {
                   </div>
                 </td>
                 <td className="px-3 py-3 text-right whitespace-nowrap align-top">
-                  <a href={assetProxyUrl(a.id, a.blob_url)} target="_blank" rel="noopener noreferrer" className="text-cyan-600 hover:underline mr-3">預覽</a>
+                  <a href={assetProxyUrl(a.id, a.blob_url)} target="_blank" rel="noopener noreferrer" className={`${signageAction.link} mr-3`}>預覽</a>
                   {!isImageFilename(a.filename) && (
                     <>
-                      <button onClick={() => openEdit(a)} className="text-amber-600 hover:underline mr-3">編輯</button>
+                      <button onClick={() => openEdit(a)} className={`${signageAction.link} mr-3`}>編輯</button>
                       <button onClick={() => handleScreenshot(a)} disabled={shotId === a.id}
-                        className="text-indigo-600 hover:underline mr-3 disabled:opacity-50">
+                        className={`${signageAction.link} mr-3 disabled:opacity-50`}>
                         {shotId === a.id ? '轉檔中…' : '轉檔'}
                       </button>
                     </>
                   )}
-                  <button onClick={() => handleDeleteOne(a.id)} className="text-red-600 hover:underline">刪除</button>
+                  <button onClick={() => handleDeleteOne(a.id)} className={signageAction.linkDanger}>刪除</button>
                 </td>
               </tr>
             ))}
@@ -661,7 +662,7 @@ export default function SiteAssetsPage() {
               assetsInManageRange.length === 0 ||
               managingDelete
             }
-            className="bg-red-600 hover:bg-red-700 disabled:opacity-30 text-white px-4 py-2 rounded-lg text-sm font-medium"
+            className={signageAction.danger}
           >
             {managingDelete ? '刪除中...' : `刪除此區間素材 (${assetsInManageRange.length})`}
           </button>

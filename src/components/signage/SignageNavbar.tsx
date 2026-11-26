@@ -1,8 +1,22 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+
+function BrandMark() {
+  return (
+    <Image
+      src="/svg/btw_wordmark.svg"
+      alt="By The Way"
+      width={120}
+      height={15}
+      className="h-3.5 w-auto"
+      priority
+    />
+  );
+}
 
 const TOP_NAV = [
   { href: '/admin/signage', label: '總覽' },
@@ -51,17 +65,11 @@ export default function SignageNavbar({ fieldLocked = false }: { fieldLocked?: b
           <div className="flex items-center gap-3 min-w-0">
             {locked ? (
               <div className="flex flex-shrink-0 items-center gap-2.5">
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-600 shadow-sm">
-                  <span className="text-sm font-bold text-white">BTW</span>
-                </span>
-                <span className="hidden text-sm font-bold tracking-tight text-slate-800 sm:block">電子看版</span>
+                <BrandMark />
               </div>
             ) : (
             <Link href="/admin/signage" className="flex flex-shrink-0 items-center gap-2.5">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-600 shadow-sm">
-                <span className="text-sm font-bold text-white">BTW</span>
-              </span>
-              <span className="hidden text-sm font-bold tracking-tight text-slate-800 sm:block">電子看版</span>
+              <BrandMark />
             </Link>
             )}
             {siteId && (

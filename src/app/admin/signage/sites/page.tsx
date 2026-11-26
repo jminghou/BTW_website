@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { getRegionLabel } from '@/lib/signage/regionLabel';
+import { signageAction } from '@/components/signage/actionStyles';
 
 interface Site {
   id: number;
@@ -154,7 +155,7 @@ export default function SitesPage() {
         <button
           onClick={openNew}
           disabled={regions.length === 0}
-          className="bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg text-sm font-medium"
+          className={signageAction.primary}
         >
           + 新增廠區
         </button>
@@ -208,10 +209,10 @@ export default function SitesPage() {
             </div>
             {error && <p className="text-red-600 text-sm">{error}</p>}
             <div className="flex gap-2">
-              <button type="submit" className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+              <button type="submit" className={signageAction.primary}>
                 {editing ? '更新' : '建立'}
               </button>
-              <button type="button" onClick={() => setShowForm(false)} className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium">
+              <button type="button" onClick={() => setShowForm(false)} className={signageAction.quiet}>
                 取消
               </button>
             </div>
@@ -244,8 +245,8 @@ export default function SitesPage() {
                 <td className="px-4 py-3 font-mono text-cyan-600">{s.code}</td>
                 <td className="px-4 py-3 text-gray-600">{s.description || '—'}</td>
                 <td className="px-4 py-3 text-right">
-                  <button onClick={() => openEdit(s)} className="text-cyan-600 hover:underline mr-3">編輯</button>
-                  <button onClick={() => handleDelete(s.id)} className="text-red-600 hover:underline">刪除</button>
+                  <button onClick={() => openEdit(s)} className={`${signageAction.link} mr-3`}>編輯</button>
+                  <button onClick={() => handleDelete(s.id)} className={signageAction.linkDanger}>刪除</button>
                 </td>
               </tr>
             ))}

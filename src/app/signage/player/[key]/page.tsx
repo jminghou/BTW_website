@@ -370,7 +370,7 @@ export default function PlayerPage() {
       )}
 
       {/* 監測標籤：螢幕名稱 + 網址代碼前 8 碼 + 目前檔名。代碼來自網址，名稱來自伺服器，兩者對不上就表示頁面被導到別台。 */}
-      <div className="absolute bottom-2 right-2 z-[99999] bg-black/70 text-white text-[11px] px-2 py-1 rounded pointer-events-none max-w-[80vw] truncate">
+      <div className="absolute bottom-2 right-3 z-[99999] text-[#cccccc] text-[10px] pointer-events-none max-w-[80vw] truncate">
         {data?.screen_name ?? '…'} · {key?.substring(0, 8)} · {active?.filename ?? '載入中'} · {currentIdx + 1}/{items.length}
       </div>
 

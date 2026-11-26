@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { signageAction } from '@/components/signage/actionStyles';
 
 interface Region {
   id: number;
@@ -82,7 +83,7 @@ export default function RegionsPage() {
           <h1 className="text-2xl font-bold text-gray-900">區域管理</h1>
           <p className="text-sm text-gray-500 mt-1">管理地理區域，如北部、中部、南部</p>
         </div>
-        <button onClick={openNew} className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+        <button onClick={openNew} className={signageAction.primary}>
           + 新增區域
         </button>
       </div>
@@ -103,10 +104,10 @@ export default function RegionsPage() {
             </div>
             {error && <p className="text-red-600 text-sm">{error}</p>}
             <div className="flex gap-2">
-              <button type="submit" className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+              <button type="submit" className={signageAction.primary}>
                 {editing ? '更新' : '建立'}
               </button>
-              <button type="button" onClick={() => setShowForm(false)} className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium">
+              <button type="button" onClick={() => setShowForm(false)} className={signageAction.quiet}>
                 取消
               </button>
             </div>
@@ -135,8 +136,8 @@ export default function RegionsPage() {
                 <td className="px-4 py-3 font-medium">{r.name}</td>
                 <td className="px-4 py-3 text-gray-600">{r.description || '—'}</td>
                 <td className="px-4 py-3 text-right">
-                  <button onClick={() => openEdit(r)} className="text-cyan-600 hover:underline mr-3">編輯</button>
-                  <button onClick={() => handleDelete(r.id)} className="text-red-600 hover:underline">刪除</button>
+                  <button onClick={() => openEdit(r)} className={`${signageAction.link} mr-3`}>編輯</button>
+                  <button onClick={() => handleDelete(r.id)} className={signageAction.linkDanger}>刪除</button>
                 </td>
               </tr>
             ))}

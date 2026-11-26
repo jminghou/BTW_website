@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { matchFilename } from '@/lib/signage/filenameFilter';
 import { isImageFilename } from '@/lib/signage/mediaType';
+import { signageAction } from '@/components/signage/actionStyles';
 
 interface Playlist {
   id: number;
@@ -361,29 +362,29 @@ export default function SitePlaylistsPage() {
 
       {/* 工具列 */}
       <div className="flex flex-wrap items-center gap-2">
-        <button onClick={openNew} className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+        <button onClick={openNew} className={signageAction.primary}>
           新增播放列表
         </button>
-        <button onClick={handleAutoCreate} disabled={busy} className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium">
+        <button onClick={handleAutoCreate} disabled={busy} className={signageAction.tool}>
           一鍵素材轉列表
         </button>
         <button onClick={handleDeleteDisconnected} disabled={busy}
-          className="bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium">
+          className={signageAction.danger}>
           刪除失聯列表
         </button>
-        <button onClick={allSelected ? deselectAll : selectAll} className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-medium">
+        <button onClick={allSelected ? deselectAll : selectAll} className={signageAction.quiet}>
           {allSelected ? '取消全選' : '全選'}
         </button>
         <button onClick={openBatchAdd} disabled={selectedIds.size === 0 || busy}
-          className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white px-4 py-2 rounded-lg text-sm font-medium">
+          className={signageAction.tool}>
           批次加入素材 ({selectedIds.size})
         </button>
         <button onClick={openDurationEditor} disabled={selectedIds.size === 0 || busy}
-          className="bg-amber-600 hover:bg-amber-700 disabled:opacity-40 text-white px-4 py-2 rounded-lg text-sm font-medium">
+          className={signageAction.tool}>
           批次修改秒數 ({selectedIds.size})
         </button>
         <button onClick={handleBatchDelete} disabled={selectedIds.size === 0 || busy}
-          className="bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white px-4 py-2 rounded-lg text-sm font-medium">
+          className={signageAction.danger}>
           刪除選取項目 ({selectedIds.size})
         </button>
         {actionMsg && <span className="text-sm text-gray-600 ml-2">{actionMsg}</span>}
@@ -423,8 +424,8 @@ export default function SitePlaylistsPage() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cyan-500" />
             </div>
             <div className="flex gap-2">
-              <button type="submit" className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg text-sm font-medium">{editing ? '更新' : '建立'}</button>
-              <button type="button" onClick={() => setShowForm(false)} className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium">取消</button>
+              <button type="submit" className={signageAction.primary}>{editing ? '更新' : '建立'}</button>
+              <button type="button" onClick={() => setShowForm(false)} className={signageAction.quiet}>取消</button>
             </div>
           </form>
         </div>
@@ -459,9 +460,9 @@ export default function SitePlaylistsPage() {
                   onClick={e => selectRow(idx, p.id, e.shiftKey)}>{p.name}</td>
                 <td className="px-4 py-3 text-gray-600">{p.description || '—'}</td>
                 <td className="px-4 py-3 text-right whitespace-nowrap">
-                  <button onClick={() => openItemsEditor(p)} className="text-cyan-600 hover:underline mr-3">編輯內容</button>
-                  <button onClick={() => openEdit(p)} className="text-cyan-600 hover:underline mr-3">改名</button>
-                  <button onClick={() => handleDelete(p.id)} className="text-red-600 hover:underline">刪除</button>
+                  <button onClick={() => openItemsEditor(p)} className={`${signageAction.link} mr-3`}>編輯內容</button>
+                  <button onClick={() => openEdit(p)} className={`${signageAction.link} mr-3`}>改名</button>
+                  <button onClick={() => handleDelete(p.id)} className={signageAction.linkDanger}>刪除</button>
                 </td>
               </tr>
             ))}
@@ -486,7 +487,7 @@ export default function SitePlaylistsPage() {
               <button onClick={() => {
                 const sel = document.getElementById('addAsset') as HTMLSelectElement;
                 if (sel.value) { addItem(Number(sel.value)); sel.value = ''; }
-              }} className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg text-sm font-medium">加入</button>
+              }} className={signageAction.primary}>加入</button>
             </div>
 
             <div className="space-y-2">
@@ -514,8 +515,8 @@ export default function SitePlaylistsPage() {
             <div className="flex items-center justify-between border-t pt-4">
               <span className="text-sm text-gray-500">{itemSaveMsg}</span>
               <div className="flex gap-2">
-                <button onClick={() => setItemsEditing(null)} className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium">關閉</button>
-                <button onClick={saveItems} className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg text-sm font-medium">儲存項目</button>
+                <button onClick={() => setItemsEditing(null)} className={signageAction.quiet}>關閉</button>
+                <button onClick={saveItems} className={signageAction.primary}>儲存項目</button>
               </div>
             </div>
           </div>
@@ -617,12 +618,12 @@ export default function SitePlaylistsPage() {
                 <button
                   onClick={() => setBatchAddOpen(false)}
                   disabled={batchBusy}
-                  className="bg-gray-200 hover:bg-gray-300 disabled:opacity-50 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium"
+                  className={signageAction.quiet}
                 >取消</button>
                 <button
                   onClick={submitBatchAdd}
                   disabled={batchBusy || batchPicked.length === 0}
-                  className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white px-4 py-2 rounded-lg text-sm font-medium"
+                  className={signageAction.primary}
                 >確定加入</button>
               </div>
             </div>
@@ -658,12 +659,12 @@ export default function SitePlaylistsPage() {
                 <button
                   onClick={() => setDurationOpen(false)}
                   disabled={durationBusy}
-                  className="bg-gray-200 hover:bg-gray-300 disabled:opacity-50 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium"
+                  className={signageAction.quiet}
                 >取消</button>
                 <button
                   onClick={submitDuration}
                   disabled={durationBusy}
-                  className="bg-amber-600 hover:bg-amber-700 disabled:opacity-40 text-white px-4 py-2 rounded-lg text-sm font-medium"
+                  className={signageAction.primary}
                 >套用</button>
               </div>
             </div>
