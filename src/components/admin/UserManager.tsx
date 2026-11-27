@@ -8,10 +8,16 @@ interface User {
   display_name: string;
   email: string;
   role: string;
+  site_id: number | null;
   is_active: boolean;
   last_login: string | null;
   created_at: string;
   updated_at: string;
+}
+
+interface SiteOption {
+  id: number;
+  name: string;
 }
 
 interface UserForm {
@@ -20,6 +26,7 @@ interface UserForm {
   display_name: string;
   email: string;
   role: string;
+  site_id: string;
 }
 
 interface EditUserForm {
@@ -27,6 +34,7 @@ interface EditUserForm {
   email: string;
   role: string;
   is_active: boolean;
+  site_id: string;
 }
 
 const USER_ROLES = [
@@ -39,8 +47,41 @@ const USER_ROLES = [
 const roleLabel = (role: string) =>
   USER_ROLES.find((item) => item.value === role)?.label ?? role;
 
+const siteLabel = (sites: SiteOption[], siteId: number | null) => {
+  if (siteId == null) return '未指派';
+  return sites.find((site) => site.id === siteId)?.name ?? `場域 #${siteId}`;
+};
+
+function SiteSelect({
+  value,
+  onChange,
+  sites,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  sites: SiteOption[];
+}) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">可進入的場域</label>
+      <select
+        required
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+      >
+        <option value="">請選擇場域</option>
+        {sites.map((site) => (
+          <option key={site.id} value={site.id}>{site.name}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 export default function UserManager() {
   const [users, setUsers] = useState<User[]>([]);
+  const [sites, setSites] = useState<SiteOption[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -53,7 +94,8 @@ export default function UserManager() {
     password: '',
     display_name: '',
     email: '',
-    role: 'admin'
+    role: 'admin',
+    site_id: ''
   });
 
   // 編輯用戶表單
@@ -61,7 +103,8 @@ export default function UserManager() {
     display_name: '',
     email: '',
     role: 'admin',
-    is_active: true
+    is_active: true,
+    site_id: ''
   });
 
   // 密碼更改表單
@@ -101,7 +144,10 @@ export default function UserManager() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(newUserForm)
+        body: JSON.stringify({
+          ...newUserForm,
+          site_id: newUserForm.role === 'field' ? Number(newUserForm.site_id) : null,
+        })
       });
 
       const result = await response.json();
@@ -113,7 +159,8 @@ export default function UserManager() {
           password: '',
           display_name: '',
           email: '',
-          role: 'admin'
+          role: 'admin',
+          site_id: ''
         });
         await loadUsers();
       } else {
@@ -141,7 +188,10 @@ export default function UserManager() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(editUserForm)
+        body: JSON.stringify({
+          ...editUserForm,
+          site_id: editUserForm.role === 'field' ? Number(editUserForm.site_id) : null,
+        })
       });
 
       const result = await response.json();
@@ -232,13 +282,26 @@ export default function UserManager() {
       display_name: user.display_name,
       email: user.email,
       role: user.role,
-      is_active: user.is_active
+      is_active: user.is_active,
+      site_id: user.site_id == null ? '' : String(user.site_id),
     });
   };
 
-  // 組件載入時獲取用戶列表
   useEffect(() => {
     loadUsers();
+    fetch('/api/signage/sites')
+      .then((response) => response.json())
+      .then((result) => {
+        if (result.success && Array.isArray(result.data)) {
+          setSites(result.data.map((site: { id: number; name: string }) => ({
+            id: Number(site.id),
+            name: site.name,
+          })));
+        }
+      })
+      .catch((loadError) => {
+        console.error('載入場域失敗：', loadError);
+      });
   }, []);
 
   return (
@@ -294,6 +357,9 @@ export default function UserManager() {
                     角色/狀態
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    場域
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     最後登入
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -330,6 +396,9 @@ export default function UserManager() {
                           {user.is_active ? '啟用' : '停用'}
                         </span>
                       </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {user.role === 'field' ? siteLabel(sites, user.site_id) : '—'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {user.last_login ? new Date(user.last_login).toLocaleString('zh-TW') : '未曾登入'}
@@ -444,6 +513,14 @@ export default function UserManager() {
                   </select>
                 </div>
 
+                {newUserForm.role === 'field' && (
+                  <SiteSelect
+                    value={newUserForm.site_id}
+                    sites={sites}
+                    onChange={(siteId) => setNewUserForm({ ...newUserForm, site_id: siteId })}
+                  />
+                )}
+
                 <div className="flex gap-3 pt-4">
                   <button
                     type="button"
@@ -514,6 +591,14 @@ export default function UserManager() {
                     ))}
                   </select>
                 </div>
+
+                {editUserForm.role === 'field' && (
+                  <SiteSelect
+                    value={editUserForm.site_id}
+                    sites={sites}
+                    onChange={(siteId) => setEditUserForm({ ...editUserForm, site_id: siteId })}
+                  />
+                )}
 
                 <div>
                   <label className="flex items-center">

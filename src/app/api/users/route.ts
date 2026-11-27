@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
   try {
     const userData = await request.json();
     
-    const { username, password, display_name, email, role } = userData;
+    const { username, password, display_name, email, role, site_id } = userData;
 
     if (!username || !password || !display_name || !email) {
       return NextResponse.json({
@@ -50,7 +50,8 @@ export async function POST(request: NextRequest) {
       password,
       display_name,
       email,
-      role
+      role,
+      site_id
     });
     
     if (result.success) {

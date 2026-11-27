@@ -33,6 +33,7 @@ export async function createTables() {
         display_name VARCHAR(100) NOT NULL,
         email VARCHAR(255) UNIQUE NOT NULL,
         role VARCHAR(20) DEFAULT 'admin',
+        site_id INTEGER,
         is_active BOOLEAN DEFAULT true,
         last_login TIMESTAMP WITH TIME ZONE,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -215,6 +216,30 @@ export async function createTables() {
   }
 }
 
+async function ensureUserSiteColumn() {
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS site_id INTEGER`;
+  // 只補尚未指派的舊帳號。之後改由用戶管理指定，不會覆蓋。
+  await sql`
+    UPDATE users SET site_id = 2
+    WHERE username = 'fab2' AND role = 'field' AND site_id IS NULL
+  `;
+  await sql`
+    UPDATE users SET site_id = 3
+    WHERE username = 'fab3' AND role = 'field' AND site_id IS NULL
+  `;
+}
+
+async function resolveFieldSite(role: string | undefined, siteId: unknown) {
+  if (role !== 'field') return { site_id: null as number | null };
+  const id = Number(siteId);
+  if (!Number.isInteger(id) || id <= 0) {
+    return { error: '現場人員必須指派場域' };
+  }
+  const found = await sql`SELECT id FROM signage_sites WHERE id = ${id} LIMIT 1`;
+  if (found.length === 0) return { error: '找不到這個場域' };
+  return { site_id: id };
+}
+
 async function ensureContactsEmailColumns() {
   await sql`ALTER TABLE contacts ADD COLUMN IF NOT EXISTS email_status VARCHAR(20);`;
   await sql`ALTER TABLE contacts ADD COLUMN IF NOT EXISTS email_error TEXT;`;
@@ -340,8 +365,9 @@ export async function saveNewsletterSubscription(email: string, name?: string) {
 // 用戶登入驗證
 export async function authenticateUser(username: string, password: string) {
   try {
+    await ensureUserSiteColumn();
     const result = await sql`
-      SELECT id, username, password_hash, display_name, email, role, is_active 
+      SELECT id, username, password_hash, display_name, email, role, site_id, is_active 
       FROM users 
       WHERE username = ${username} AND is_active = true;
     `;
@@ -381,8 +407,14 @@ export async function createUser(userData: {
   display_name: string;
   email: string;
   role?: string;
+  site_id?: number | null;
 }) {
   try {
+    await ensureUserSiteColumn();
+    const role = userData.role || 'admin';
+    const site = await resolveFieldSite(role, userData.site_id);
+    if ('error' in site) return { success: false, error: site.error };
+
     // 檢查用戶名是否已存在
     const existingUser = await sql`
       SELECT id FROM users WHERE username = ${userData.username} OR email = ${userData.email};
@@ -396,10 +428,10 @@ export async function createUser(userData: {
     const hashedPassword = await bcrypt.hash(userData.password, 12);
 
     const result = await sql`
-      INSERT INTO users (username, password_hash, display_name, email, role)
+      INSERT INTO users (username, password_hash, display_name, email, role, site_id)
       VALUES (${userData.username}, ${hashedPassword}, ${userData.display_name}, 
-              ${userData.email}, ${userData.role || 'admin'})
-      RETURNING id, username, display_name, email, role, is_active, created_at;
+              ${userData.email}, ${role}, ${site.site_id})
+      RETURNING id, username, display_name, email, role, site_id, is_active, created_at;
     `;
 
     console.log('新用戶建立成功：', result[0]);
@@ -413,8 +445,9 @@ export async function createUser(userData: {
 // 取得所有用戶
 export async function getUsers() {
   try {
+    await ensureUserSiteColumn();
     const result = await sql`
-      SELECT id, username, display_name, email, role, is_active, last_login, created_at, updated_at
+      SELECT id, username, display_name, email, role, site_id, is_active, last_login, created_at, updated_at
       FROM users 
       ORDER BY created_at DESC;
     `;
@@ -432,21 +465,26 @@ export async function updateUser(userId: number, userData: {
   email?: string;
   role?: string;
   is_active?: boolean;
+  site_id?: number | null;
 }) {
   try {
+    await ensureUserSiteColumn();
     // 使用多個條件查詢來處理動態更新
     let result;
     
     if (userData.display_name !== undefined && userData.email !== undefined && userData.role !== undefined && userData.is_active !== undefined) {
+      const site = await resolveFieldSite(userData.role, userData.site_id);
+      if ('error' in site) return { success: false, error: site.error };
       result = await sql`
         UPDATE users SET 
           display_name = ${userData.display_name},
           email = ${userData.email},
           role = ${userData.role},
+          site_id = ${site.site_id},
           is_active = ${userData.is_active},
           updated_at = CURRENT_TIMESTAMP
         WHERE id = ${userId}
-        RETURNING id, username, display_name, email, role, is_active, updated_at
+        RETURNING id, username, display_name, email, role, site_id, is_active, updated_at
       `;
     } else if (userData.display_name !== undefined) {
       result = await sql`

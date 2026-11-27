@@ -13,16 +13,11 @@ export const LOGIN_IDENTITIES = [
   { value: 'field', label: '現場人員' },
 ] as const;
 
-export const LOGIN_FACTORIES = [
-  { id: 1, label: '世界1廠' },
-  { id: 2, label: '世界2廠' },
-  { id: 3, label: '世界3廠' },
-] as const;
-
-/** 已開放現場人員登入的廠區。其他廠先不設定。 */
-export const FIELD_SITE_HOME: Record<number, string> = {
-  3: '/admin/signage/site/3/schedules',
-};
+/** 現場人員只能進入帳號上指派的那一個場域排程。 */
+export function fieldHomeForSite(siteId: number): string | null {
+  if (!Number.isInteger(siteId) || siteId <= 0) return null;
+  return `/admin/signage/site/${siteId}/schedules`;
+}
 
 export function readStaffSession(): StaffSession | null {
   if (typeof window === 'undefined') return null;
@@ -41,5 +36,5 @@ export function isFieldStaff(session: StaffSession | null): boolean {
 
 export function fieldStaffHome(session: StaffSession | null): string | null {
   if (!isFieldStaff(session)) return null;
-  return FIELD_SITE_HOME[Number(session?.siteId)] ?? null;
+  return fieldHomeForSite(Number(session?.siteId));
 }

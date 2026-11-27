@@ -4,9 +4,8 @@ import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import {
-  FIELD_SITE_HOME,
-  LOGIN_FACTORIES,
   LOGIN_IDENTITIES,
+  fieldHomeForSite,
   fieldStaffHome,
   isFieldStaff,
   readStaffSession,
@@ -34,7 +33,6 @@ interface LoginForm {
   username: string;
   password: string;
   loginAs: 'admin' | 'field';
-  siteId: string;
 }
 
 export default function AdminPage() {
@@ -45,7 +43,6 @@ export default function AdminPage() {
     username: '',
     password: '',
     loginAs: 'admin',
-    siteId: '3',
   });
   const [loginError, setLoginError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
@@ -98,15 +95,15 @@ export default function AdminPage() {
           setLoginError('此帳號不是現場人員');
           return;
         }
-        const home = FIELD_SITE_HOME[Number(loginForm.siteId)];
+        const home = fieldHomeForSite(Number(result.data?.site_id));
         if (!home) {
-          setLoginError('此廠區尚未開放現場人員登入');
+          setLoginError('此帳號尚未指派場域，請聯絡管理員');
           return;
         }
         localStorage.setItem('userInfo', JSON.stringify({
           ...result.data,
           loginAs: 'field',
-          siteId: Number(loginForm.siteId),
+          siteId: Number(result.data.site_id),
         }));
         setFieldRedirect(true);
         router.replace(home);
@@ -134,7 +131,7 @@ export default function AdminPage() {
 
   const handleLogout = () => {
     setIsAuthenticated(false);
-    setLoginForm({ username: '', password: '', loginAs: 'admin', siteId: '3' });
+    setLoginForm({ username: '', password: '', loginAs: 'admin' });
     // 清除儲存的用戶資訊
     if (typeof window !== 'undefined') {
       localStorage.removeItem('userInfo');
@@ -202,34 +199,20 @@ export default function AdminPage() {
                 <label id="login-identity-label" className="block text-sm font-medium text-gray-700 mb-2">
                   登入身份
                 </label>
-                <div className="grid grid-cols-2 gap-3" role="group" aria-labelledby="login-identity-label">
-                  <select
-                    id="loginAs"
-                    name="loginAs"
-                    aria-label="身份"
-                    value={loginForm.loginAs}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors bg-white"
-                  >
-                    {LOGIN_IDENTITIES.map((identity) => (
-                      <option key={identity.value} value={identity.value}>{identity.label}</option>
-                    ))}
-                  </select>
-                  <select
-                    id="siteId"
-                    name="siteId"
-                    aria-label="廠區"
-                    value={loginForm.siteId}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors bg-white"
-                  >
-                    {LOGIN_FACTORIES.map((factory) => (
-                      <option key={factory.id} value={factory.id}>{factory.label}</option>
-                    ))}
-                  </select>
-                </div>
+                <select
+                  id="loginAs"
+                  name="loginAs"
+                  aria-label="身份"
+                  value={loginForm.loginAs}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors bg-white"
+                >
+                  {LOGIN_IDENTITIES.map((identity) => (
+                    <option key={identity.value} value={identity.value}>{identity.label}</option>
+                  ))}
+                </select>
                 {loginForm.loginAs === 'field' && (
-                  <p className="mt-2 text-xs text-gray-500">目前僅開放世界3廠</p>
+                  <p className="mt-2 text-xs text-gray-500">會進入管理員在用戶管理裡指派的場域，不能自行切換。</p>
                 )}
               </div>
               
